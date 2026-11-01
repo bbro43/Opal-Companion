@@ -1,9 +1,9 @@
 // Opal Companion offline cache. Bump VERSION whenever the app files change.
-const VERSION = "opal-2026-11-01";
-const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png",
-  "fonts/barlow-condensed-latin-500-normal.woff2", "fonts/barlow-condensed-latin-600-normal.woff2", "fonts/barlow-condensed-latin-700-normal.woff2",
-  "fonts/nunito-sans-latin-400-normal.woff2", "fonts/nunito-sans-latin-600-normal.woff2", "fonts/nunito-sans-latin-700-normal.woff2", "fonts/nunito-sans-latin-800-normal.woff2",
-  "fonts/jetbrains-mono-latin-500-normal.woff2", "fonts/jetbrains-mono-latin-700-normal.woff2"];
+const VERSION = "opal-2026-11-01b";
+const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "maskable-512.png",
+  "barlow-condensed-latin-500-normal.woff2", "barlow-condensed-latin-600-normal.woff2", "barlow-condensed-latin-700-normal.woff2",
+  "nunito-sans-latin-400-normal.woff2", "nunito-sans-latin-600-normal.woff2", "nunito-sans-latin-700-normal.woff2", "nunito-sans-latin-800-normal.woff2",
+  "jetbrains-mono-latin-500-normal.woff2", "jetbrains-mono-latin-700-normal.woff2"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 // Serve from the cache right away; refresh the cache in the background when online.
