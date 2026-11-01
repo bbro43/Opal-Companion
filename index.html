@@ -284,6 +284,12 @@ table.t td.n { font-family: var(--mono); text-align: right; }
 .appeal td.me { font-weight: 800; color: var(--accent); }
 .appeal tr.top td { background: var(--soft); }
 @media (max-width: 400px) { .tabs button { font-size: 10.5px; } }
+.shiny-wrap { position: relative; display: inline-block; flex: none; line-height: 0; }
+.shiny-wrap::before { content: ""; position: absolute; left: -3px; top: -3px; width: 34%; height: 34%; min-width: 12px; min-height: 12px; background: center/contain no-repeat; z-index: 1; pointer-events: none; }
+.mon-title { font-size: 12.5px; font-style: italic; color: var(--accent); font-weight: 700; display: block; line-height: 1.2; }
+.fn .mon-title { font-size: 11.5px; }
+
+.shiny-wrap::before{background-image:url(data:image/png;base64,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)}
 
 .gem{background:url(data:image/png;base64,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) center/contain no-repeat;border-radius:50%;box-shadow:none}
 
@@ -374,7 +380,8 @@ function monImgSrc(name) {
   const k = Object.keys(m).find((n) => n.startsWith(base + " "));
   return k ? m[k] : "";
 }
-const sprite = (name, cls = "") => { const s = monImgSrc(name); return s ? `<img class="spr ${cls}" src="${s}" alt="" loading="lazy">` : `<span class="spr ${cls} spr-none" aria-hidden="true"></span>`; };
+const sprite = (name, cls = "", shiny = false) => { const s = monImgSrc(name); const img = s ? `<img class="spr ${cls}" src="${s}" alt="" loading="lazy">` : `<span class="spr ${cls} spr-none" aria-hidden="true"></span>`; return shiny ? `<span class="shiny-wrap ${cls}" title="Shiny">${img}</span>` : img; };
+const markTitle = (mark) => { const x = mark && MARKS.find((k) => k.name === mark); return x ? x.title : ""; };
 const itemIcon = (name, cls = "") => { const s = IMGS.item[name]; return s ? `<img class="ico ${cls}" src="${s}" alt="" loading="lazy">` : ""; };
 const awardIcon = (key, cls = "") => { const s = IMGS.award[key]; return s ? `<img class="aw-ico ${cls}" src="${s}" alt="">` : ""; };
 
@@ -1160,9 +1167,9 @@ function monCard(m, opts = {}) {
   const pct = clamp(hpNow / s.hp, 0, 1);
   const inParty = S.party.includes(m.id);
   return `<article class="mon ${hpNow === 0 ? "fainted" : ""}">
-    ${sprite(m.mega && megaOf(m.sp) ? megaOf(m.sp).name : m.sp)}
+    ${sprite(m.mega && megaOf(m.sp) ? megaOf(m.sp).name : m.sp, "", m.shiny)}
     <div style="min-width:0">
-      <div class="mon-name">${esc(monName(m))}${m.shiny ? ' <span title="Shiny" style="color:var(--gold)">✦</span>' : ""}</div>
+      <div class="mon-name">${esc(monName(m))}</div>${m.mark ? `<div class="mon-title">${esc(markTitle(m.mark))}</div>` : ""}
       <div class="mon-meta">${m.nick ? `<span class="small muted">${esc(m.sp)}</span>` : ""}${s.types.map(typeChip).join("")}${m.gender ? `<span class="pill">${m.gender === "F" ? "♀" : "♂"}</span>` : ""}${m.mark ? `<span class="pill accent">${esc(m.mark)}</span>` : ""}${m.status ? `<span class="pill bad">${esc(m.status)}</span>` : ""}</div>
       <div class="statline"><div class="st"><span>HP</span><b>${hpNow}${hpNow !== s.hp ? `<small class="muted">/${s.hp}</small>` : ""}</b></div><div class="st"><span>ATK</span><b>d${s.atk}</b></div><div class="st"><span>DEF</span><b>${s.def}</b></div><div class="st"><span>SPD</span><b>${s.spd}</b></div><div class="st"><span>BST</span><b>${s.hp + s.atk + s.def + s.spd}</b></div></div>
       ${hpNow !== s.hp ? `<div class="hpbar ${pct < 0.25 ? "low" : pct < 0.5 ? "mid" : ""}" style="margin-top:6px"><i style="width:${pct * 100}%"></i></div>` : ""}
@@ -1266,20 +1273,32 @@ function vMap() {
   ${L.it.length ? `<section class="card"><div class="card-h"><h2>Free items here</h2><span class="sub">One of each</span></div><div class="list">${L.it.map((n) => { const k = L.n + "|" + n; const got = S.collected[k]; const it = itemFind(ITEM_FIX[n.toLowerCase()] || n); return `<div class="li"><div class="main"><div class="t">${esc(n)}</div><div class="d">${esc(it ? it.desc : "Not in the Item Dex.")}</div></div>${got ? `<span class="pill good">Collected</span>` : `<button class="btn sm" data-act="collect" data-name="${esc(n)}">Pick up</button>`}</div>`; }).join("")}</div></section>` : ""}
   ${L.poi.length ? `<section class="card"><div class="card-h"><h2>Places of interest</h2></div><div class="list">${L.poi.map((p) => `<div class="li"><div class="main"><div class="t">${esc(p[0])}</div>${p[1] ? `<div class="d">${esc(p[1])}</div>` : ""}</div></div>`).join("")}</div></section>` : ""}`;
 }
+function compOf(L, e) {
+  if (/^(Beauty|Cool|Cute|Clever|Tough) Contest$/.test(e.t) || /Contest Hall$/.test(e.t)) { const h = HALLS.find((x) => x.town === L.n); if (h) return { kind: "contest", id: h.id, info: /Contest Hall$/.test(e.t) }; }
+  if (/ Gym$/.test(e.t)) { const g = GYMS.find((x) => x.town === L.n); if (g) return { kind: "gym", id: g.id }; }
+  if (/^The Battle \w+$/.test(e.t)) { const f = FRONTIER.find((x) => x.town === L.n); if (f) return { kind: "frontier", id: f.id }; }
+  return null;
+}
+const COMP_TXT = { contest: ["Ribbon Obtained", "Awaiting Next Contest"], gym: ["Badge Obtained", "Awaiting Rematch"], frontier: ["Symbol Obtained", "Awaiting Rematch"] };
 function evList(L) {
   return L.ev.map((e, i) => {
     const k = eventKey(L.n, e), rec0 = S.events[k], rec = rec0 === "done" ? "passed" : rec0;
-    const rep = REPEATABLE.test(e.t);
+    const rep = REPEATABLE.test(e.t), comp = compOf(L, e);
     let st = reqStatus(e), label = "";
-    if (rec && !rep) { st = "past"; label = rec === "passed" ? "Passed" : "Failed"; }
+    if (comp) {
+      const won = S.awards[comp.id] && S.awards[comp.id].on;
+      if (won) { st = "past"; label = COMP_TXT[comp.kind][0]; }
+      else if (st === "missed") { st = "past"; label = "Missed"; }
+      else if (st !== "later" && (comp.kind === "contest" ? S.lastHall === comp.id : rec === "failed")) label = COMP_TXT[comp.kind][1];
+    } else if (rec && !rep) { st = "past"; label = rec === "passed" ? "Passed" : "Failed"; }
     else if (st === "missed") { st = "past"; label = rec ? (rec === "passed" ? "Passed" : "Failed") : "Missed"; }
-    return { e, i, k, rec, rep, st, label };
+    return { e, i, k, rec, rep, st, label, comp };
   });
 }
-const ST_PILL = { Passed: "good", Failed: "bad", Missed: "warn" };
+const ST_PILL = { Passed: "good", Failed: "bad", Missed: "warn", "Ribbon Obtained": "good", "Badge Obtained": "good", "Symbol Obtained": "good", "Awaiting Next Contest": "warn", "Awaiting Rematch": "warn" };
 function evCard(L, x) {
   const e = x.e;
-  const cls = { now: "now", special: "special", later: "later", past: x.label === "Passed" ? "done" : "missed" }[x.st];
+  const cls = { now: "now", special: "special", later: "later", past: /Passed|Obtained/.test(x.label) ? "done" : "missed" }[x.st];
   const n = eventTrainers(L, e).length;
   return `<div class="ev ${cls}"><div class="row between ev-head" data-act="ev-view" data-loc="${esc(L.n)}" data-i="${x.i}"><span class="t">${esc(e.t)} <span class="muted small">›</span></span>${x.label ? `<span class="pill ${ST_PILL[x.label]}">${x.label}</span>` : e.r ? `<span class="pill ${x.st === "now" ? "good" : x.st === "special" ? "warn" : ""}">${esc(e.r)}</span>` : `<span class="pill">Always open</span>`}</div>
     <div class="d clamp">${esc(e.d)}</div>
@@ -1287,6 +1306,12 @@ function evCard(L, x) {
 }
 function evButtons(L, x) {
   if (x.st === "later") return "";
+  if (x.comp) {
+    if (x.comp.info || /Obtained/.test(x.label)) return "";
+    if (x.label === "Awaiting Next Contest") return `<span class="tiny muted">Enter a contest at a different Hall first.</span>`;
+    if (x.st === "past") return "";
+    return `<button class="btn sm primary" data-act="ev-open" data-loc="${esc(L.n)}" data-i="${x.i}">Open</button>`;
+  }
   if (x.label && !x.rep) return `<button class="btn sm ghost" data-act="ev-undo" data-k="${esc(x.k)}">Undo</button>`;
   return `<button class="btn sm primary" data-act="ev-open" data-loc="${esc(L.n)}" data-i="${x.i}">Open</button>${x.rec && x.rep ? `<span class="pill ${x.rec === "passed" ? "good" : "bad"}">Last: ${x.rec === "passed" ? "Passed" : "Failed"}</span>` : ""}`;
 }
@@ -1373,7 +1398,8 @@ let BUNDO = [];
 function myTrainer() { const s = statsAll(); return { hasTrainer: true, name: S.trainer.name || "You", obedience: s.obedience, intuition: s.intuition, will: s.will, timing: s.timing, accuracy: s.accuracy, compassion: s.compassion, execution: s.execution || 0 }; }
 function fighterFromMon(m) {
   const s = monStats(m);
-  return makeFighter({ name: monName(m), sp: m.mega ? (megaOf(m.sp) || {}).name || m.sp : m.sp, types: s.types, hp: s.hp, atk: s.atk, def: s.def, spd: s.spd, abilities: monAbilities(m), ability: m.ab || monAbilities(m)[0], item: m.item, gender: m.gender, monId: m.id, curHp: m.hp == null ? s.hp : m.hp, status: m.status }, "me");
+  const f0 = makeFighter({ name: monName(m), sp: m.mega ? (megaOf(m.sp) || {}).name || m.sp : m.sp, types: s.types, hp: s.hp, atk: s.atk, def: s.def, spd: s.spd, abilities: monAbilities(m), ability: m.ab || monAbilities(m)[0], item: m.item, gender: m.gender, monId: m.id, curHp: m.hp == null ? s.hp : m.hp, status: m.status }, "me");
+  return Object.assign(f0, { shiny: !!m.shiny, mark: m.mark || "" });
 }
 function fighterFromRow(r, side) {
   // trainer row: [name, types, hp, atk, def, spd, ability, hidden]
@@ -1414,7 +1440,7 @@ function startTrainerBattle(locName, i) {
 }
 function startWildBattle(enc) {
   const f = makeFighter({ name: enc.sp, sp: enc.sp, types: enc.types, hp: enc.hp, atk: enc.atk, def: enc.def, spd: enc.spd, abilities: enc.abilities, ability: enc.ability, gender: enc.gender }, "foe");
-  f.enc = enc;
+  f.enc = enc; f.shiny = !!enc.shiny; f.mark = enc.mark || ""; f.nature = enc.nature || "";
   newBattle({ kind: "wild", title: `Wild ${enc.sp}${enc.shiny ? " ✦" : ""} — ${S.loc}`, foeTrainer: { hasTrainer: false, name: "Wild", obedience: 0, intuition: 0, will: 0 }, foeMons: [f], canCatch: true });
 }
 
@@ -1427,7 +1453,7 @@ function fighterCard(B, f, isActive, side) {
   const it = f.item ? itemFind(f.item) : null;
   const key = f.key;
   return `<div class="fighter ${isActive ? "active" : ""}">
-    <div class="row between"><span class="fn">${sprite(f.sp, "sm")} ${esc(f.name)}${f.mega ? " (Mega)" : ""}${f.dmax ? " (Dynamax " + f.dmax + ")" : ""}</span><span>${f.types.map(typeChip).join(" ")}</span></div>
+    <div class="row between"><span class="fn">${sprite(f.sp, "sm", f.shiny)} <span>${esc(f.name)}${f.mega ? " (Mega)" : ""}${f.dmax ? " (Dynamax " + f.dmax + ")" : ""}${f.mark ? `<span class="mon-title">${esc(markTitle(f.mark))}</span>` : ""}${f.nature ? `<span class="tiny muted" style="display:block">${esc(f.nature)} Nature</span>` : ""}</span></span><span>${f.types.map(typeChip).join(" ")}</span></div>
     <div class="row between"><span class="num"><b>${f.hp}</b>/${f.maxHp} HP</span>
       <span class="row"><button class="btn sm" data-act="hp" data-k="${key}" data-v="-1" aria-label="Lose 1 HP">−</button><button class="btn sm" data-act="hp" data-k="${key}" data-v="1" aria-label="Gain 1 HP">+</button></span></div>
     <div class="hpbar ${pct < 0.25 ? "low" : pct < 0.5 ? "mid" : ""}"><i style="width:${pct * 100}%"></i></div>
@@ -1538,42 +1564,48 @@ function contestDefaultType() {
   const open = evList(L).find((x) => x.st === "now" && /^(Beauty|Cool|Cute|Clever|Tough) Contest$/.test(x.e.t));
   return open ? open.e.t.split(" ")[0] : "Cool";
 }
-function vContestSetup() {
-  const C = UI.contest || (UI.contest = { type: contestDefaultType(), mon: (partyMons()[0] || {}).id || "", nums: [] });
+function appealRows(C) {
   const m = S.mons.find((x) => x.id === C.mon) || partyMons()[0];
-  const hall = HALLS.find((h) => h.town === S.loc);
   const me = m && myAppeal(m, C.type);
   const rows = [];
-  if (me) rows.push({ me: true, name: S.trainer.name || "You", mon: monName(m), v: me.v });
-  C.nums.forEach((n) => { const c = CONTESTANTS.find((x) => x.num === n); if (!c) return; const b = contestantEntry(c, C.type); if (b) rows.push({ me: false, num: n, name: c.t.n, mon: b.row[0], v: b.v, c, row: b.row }); });
-  rows.sort((a, b) => b.v - a.v || (a.me ? -1 : b.me ? 1 : 0));
+  if (me) rows.push({ id: "me", me: true, name: S.trainer.name || "You", mon: monName(m), sp: m.sp, shiny: m.shiny, v: me.v });
+  C.nums.filter(Boolean).forEach((n) => { const c = CONTESTANTS.find((x) => x.num === n); if (!c) return; const b = contestantEntry(c, C.type); if (b) rows.push({ id: n, me: false, num: n, name: c.t.n, mon: b.row[0], sp: b.row[0], v: b.v, c, row: b.row }); });
+  C.ro = C.ro || {};
+  const tied = rows.filter((r) => rows.some((o) => o !== r && o.v === r.v));
+  tied.forEach((r) => { if (!C.ro[r.id]) { let x; do { x = rnd(20); } while (tied.some((o) => o !== r && o.v === r.v && C.ro[o.id] === x)); C.ro[r.id] = x; } r.ro = C.ro[r.id]; });
+  rows.sort((a, b) => b.v - a.v || (b.ro || 0) - (a.ro || 0));
+  return { m, me, rows };
+}
+function vContestSetup() {
+  const C = UI.contest || (UI.contest = { type: contestDefaultType(), mon: (partyMons()[0] || {}).id || "", nums: [], ro: {} });
+  const { m, me, rows } = appealRows(C);
+  const hall = HALLS.find((h) => h.town === S.loc);
+  const hallWon = hall && (S.awards[hall.id] || {}).on, blocked = hall && !hallWon && S.lastHall === hall.id;
   const ready = me && C.nums.filter(Boolean).length === 3;
-  const top = rows.slice(0, 2), tie = rows.length > 2 && rows[1].v === rows[2].v;
+  const top = rows.slice(0, 2);
   const meTop = top.some((r) => r.me);
   const foe = meTop ? top.find((r) => !r.me) : null;
   return `<section class="card">
     <div class="card-h"><h2>Contest</h2><span class="sub">${hall ? esc(S.loc) + " Contest Hall" : "No Contest Hall here"}</span></div>
+    ${hallWon ? `<div class="reminder">You already have the ${esc(S.awards[hall.id].type || "")} Ribbon from this Hall. Only one Ribbon per Hall.</div>` : blocked ? `<div class="reminder">You lost your last contest here. Enter a contest at a different Hall before coming back.</div>` : ""}
     <div class="grid2">
       <label class="f" for="ct-type">Contest<select id="ct-type" data-change="ct-type">${CONTEST_TYPES.map((t) => `<option ${t === C.type ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label class="f" for="ct-mon">Your Pokémon<select id="ct-mon" data-change="ct-mon">${partyMons().map((p) => `<option value="${p.id}" ${m && p.id === m.id ? "selected" : ""}>${esc(monName(p))} · ${esc(p.nature)}</option>`).join("")}</select></label>
     </div>
-    ${me ? `<div class="small">Your Appeal Score: <b>${me.v}</b> <span class="muted">(${me.parts.map((p) => esc(p[0]) + " " + (p[1] > 0 && p[0] !== me.parts[0][0] ? "+" : "") + p[1]).join(", ")})</span></div>` : `<div class="empty">Add a Pokémon to your party first.</div>`}
+    ${me ? `<div class="small">Your Appeal Score: <b>${me.v}</b> <span class="muted">(${me.parts.map((p, i) => esc(p[0]) + " " + (i && p[1] > 0 ? "+" : "") + p[1]).join(", ")})</span></div>` : `<div class="empty">Add a Pokémon to your party first.</div>`}
     <div class="stack"><div class="tiny muted" style="font-weight:800">OTHER COORDINATORS (ROLL 3d10)</div>
       <div class="row">${[0, 1, 2].map((k) => `<select data-change="ct-num" data-k="${k}" aria-label="Participant ${k + 1}"><option value="">#</option>${CONTESTANTS.map((c) => `<option value="${c.num}" ${C.nums[k] === c.num ? "selected" : ""}>${c.num}. ${esc(c.t.n.replace(/^(Coordinator|Rival) /, ""))}</option>`).join("")}</select>`).join("")}
       <button class="btn" data-act="ct-roll">Roll 3d10</button></div></div>
-    ${rows.length > 1 ? `<div class="scroll-x"><table class="t appeal"><thead><tr><th>#</th><th>Coordinator</th><th>Pokémon</th><th class="n">Appeal</th></tr></thead><tbody>${rows.map((r, i) => `<tr class="${i < 2 ? "top" : ""}"><td>${i + 1}</td><td class="${r.me ? "me" : ""}">${esc(r.name)}${r.num ? ` <span class="tiny muted">#${r.num}</span>` : ""}</td><td>${sprite(r.me ? m.sp : r.mon, "xs")} ${esc(r.mon)}</td><td class="n">${r.v}</td></tr>`).join("")}</tbody></table></div>` : ""}
-    ${ready ? (tie ? `<div class="reminder">2nd and 3rd place are tied at ${rows[1].v}. Settle it with a roll-off, then set the participants so the winner is in the top 2.</div>` : "") +
-      (meTop && foe ? `<div class="row"><button class="btn primary" data-act="ct-start">Contest battle vs ${esc(foe.name)}'s ${esc(foe.mon)}</button></div>` : meTop ? "" : `<div class="reminder">You didn't make the Battle Round. ${esc(rows.find((r) => !r.me).name)} wins this contest. <button class="btn sm" data-act="ct-lost">Log it</button></div>`) : `<div class="tiny muted">Pick or roll 3 different participants. The two highest Appeal Scores go to the Contest Battle.</div>`}
-    <details class="tiny muted"><summary>Contest Battle rules</summary>Each side starts with 10 Contest Points (12 with a Black Scarf). Lose 1 when your Pokémon is hit, misses, gets a status condition, or when the opponent's roll + Execution is 20 or more. It ends when a side hits 0 points, a Pokémon faints, or both have taken 5 turns (most points wins).</details>
+    ${rows.length > 1 ? `<div class="scroll-x"><table class="t appeal"><thead><tr><th>#</th><th>Coordinator</th><th>Pokémon</th><th class="n">Appeal</th></tr></thead><tbody>${rows.map((r, i) => `<tr class="${i < 2 ? "top" : ""}"><td>${i + 1}</td><td class="${r.me ? "me" : ""}">${esc(r.name)}${r.num ? ` <span class="tiny muted">#${r.num}</span>` : ""}</td><td>${sprite(r.sp, "xs", r.shiny)} ${esc(r.mon)}</td><td class="n">${r.v}${r.ro ? ` <span class="tiny muted">tie · d20 ${r.ro}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>` : ""}
+    ${ready ? (meTop && foe ? `<div class="row"><button class="btn primary" data-act="ct-start" ${hallWon || blocked ? "disabled" : ""}>Contest battle vs ${esc(foe.name)}'s ${esc(foe.mon)}</button></div>` : meTop ? "" : `<div class="reminder">You didn't make the Battle Round. ${esc(rows.find((r) => !r.me).name)} wins this contest. <button class="btn sm" data-act="ct-lost">Log it</button></div>`) : `<div class="tiny muted">Pick or roll 3 different participants. The two highest Appeal Scores go to the Contest Battle. Ties are settled with a d20 roll-off.</div>`}
+    <details class="tiny muted"><summary>Contest Battle rules</summary>Each side starts with 10 Contest Points (12 with a Black Scarf). Lose 1 when your Pokémon is hit, misses, gets a status condition, or when the opponent's roll + Execution is 20 or more. It ends when a side hits 0 points, a Pokémon faints, or both have taken 5 turns (most points wins; a tie goes to a d20 roll-off). One Ribbon per Hall; after a loss, enter a contest at a different Hall before coming back.</details>
   </section>`;
 }
 function startContestBattle() {
-  const C = UI.contest; const m = S.mons.find((x) => x.id === C.mon) || partyMons()[0];
-  const rows = C.nums.filter(Boolean).map((n) => CONTESTANTS.find((x) => x.num === n)).filter(Boolean).map((c) => ({ c, b: contestantEntry(c, C.type) }));
-  const myV = myAppeal(m, C.type).v;
-  const all = rows.map((r) => ({ v: r.b.v, r })).concat([{ v: myV, me: true }]).sort((a, b) => b.v - a.v || (a.me ? -1 : 1));
-  const foe = all.slice(0, 2).find((x) => !x.me); if (!foe) return;
-  const t = foe.r.c.t, f = fighterFromRow(foe.r.b.row, "foe");
+  const C = UI.contest; const { m, rows } = appealRows(C);
+  const top = rows.slice(0, 2); if (!top.some((r) => r.me)) return;
+  const foe = top.find((r) => !r.me); if (!foe) return;
+  const t = foe.c.t, f = fighterFromRow(foe.row, "foe");
   const hall = HALLS.find((h) => h.town === S.loc);
   const scarf = m.item === "Black Scarf";
   newBattle({ kind: "contest", title: `${C.type} Contest vs ${t.n}`, indoor: true, format: 1, meMons: [m], reward: "",
@@ -1740,7 +1772,7 @@ function openMon(id) {
   const abil = [d.ab1 && { k: "1", n: d.ab1, l: "Ability 1" }, d.ab2 && { k: "2", n: d.ab2, l: "Ability 2" }].filter(Boolean);
   const vitTotal = Object.values(m.vit || {}).reduce((a, b) => a + b, 0);
   modal(monName(m), `
-    <div class="row">${sprite(m.mega && megaOf(m.sp) ? megaOf(m.sp).name : m.sp, "lg")}</div>
+    <div class="row">${sprite(m.mega && megaOf(m.sp) ? megaOf(m.sp).name : m.sp, "lg", m.shiny)}${m.mark ? `<div class="mon-title">${esc(monName(m))} ${esc(markTitle(m.mark))}</div>` : ""}</div>
     <div class="row">${s.types.map(typeChip).join(" ")}<span class="muted small">${esc(m.sp)} · #${d.num || "?"}</span>${m.caught && m.caught.loc ? `<span class="muted small">· caught at ${esc(m.caught.loc)}</span>` : ""}</div>
     <div class="statline"><div class="st"><span>HP</span><b>${s.hp}</b></div><div class="st"><span>ATK</span><b>d${s.atk}</b></div><div class="st"><span>DEF</span><b>${s.def}</b></div><div class="st"><span>SPD</span><b>${s.spd}</b></div><div class="st"><span>BST</span><b>${s.hp + s.atk + s.def + s.spd}</b></div></div>
     <div class="grid2">
@@ -1805,7 +1837,7 @@ function openAddMon(prefill) {
     const m = newMon(sp, prefill || {});
     const d = dexFind(sp);
     modal("Add " + d.name, `
-      <div class="row">${sprite(d.name, "lg")}</div>
+      <div class="row">${sprite(d.name, "lg", m.shiny)}</div>
       <div class="row">${d.types.map(typeChip).join(" ")}<span class="small muted">BST ${d.total}${d.total > obedCap(statsAll().obedience) ? ` · <b style="color:var(--warn)">over your catch limit of ${obedCap(statsAll().obedience)}</b>` : ""}</span></div>
       <div class="small muted">Gender, ability, Hidden Ability, Nature, Shiny and Mark were rolled for you. Change anything that doesn't match your table rolls.</div>
       <div class="grid2">
@@ -1816,11 +1848,12 @@ function openAddMon(prefill) {
         <label class="f" for="n-ball">Caught in<select id="n-ball"><option value="">Gift / no ball</option>${ITEMS.filter((i) => i.cat === "PokéBall").map((i) => `<option ${i.name === (prefill && prefill.ball) ? "selected" : ""}>${esc(i.name)}</option>`).join("")}</select></label>
         <label class="f" for="n-fr">Starting Friendship<input id="n-fr" type="number" min="0" max="10" value="${m.fr}"></label>
       </div>
-      <div class="row"><label class="check"><input type="checkbox" id="n-hid" ${m.hasHidden ? "checked" : ""} ${d.hidden ? "" : "disabled"}> Hidden Ability${d.hidden ? ": " + esc(d.hidden) : ""}</label><label class="check"><input type="checkbox" id="n-shiny" ${m.shiny ? "checked" : ""}> Shiny</label>${m.mark ? `<span class="pill accent">${esc(m.mark)}</span>` : ""}</div>
+      <div class="row"><label class="check"><input type="checkbox" id="n-hid" ${m.hasHidden ? "checked" : ""} ${d.hidden ? "" : "disabled"}> Hidden Ability${d.hidden ? ": " + esc(d.hidden) : ""}</label><label class="check"><input type="checkbox" id="n-shiny" ${m.shiny ? "checked" : ""}> Shiny</label></div>
+      <label class="f" for="n-mark">Mark<select id="n-mark"><option value="">None</option>${MARKS.map((x) => `<option value="${esc(x.name)}" ${x.name === m.mark ? "selected" : ""}>${esc(x.name)} (${esc(x.title)})</option>`).join("")}</select></label>
       <div class="row"><button class="btn primary" data-add>Add to ${S.party.length < 6 ? "Party" : "Box"}</button><label class="check"><input type="checkbox" id="n-ball-use" checked> Take the ball from my Bag</label></div>`, (el) => {
       $("[data-add]", el).addEventListener("click", () => {
         m.nick = $("#n-nick", el).value.trim(); m.gender = $("#n-gender", el).value; m.nature = $("#n-nature", el).value; m.slot = +$("#n-slot", el).value || 1;
-        m.hasHidden = $("#n-hid", el).checked; m.shiny = $("#n-shiny", el).checked; m.fr = clamp(+$("#n-fr", el).value || 0, 0, 10);
+        m.hasHidden = $("#n-hid", el).checked; m.shiny = $("#n-shiny", el).checked; m.mark = $("#n-mark", el).value; m.fr = clamp(+$("#n-fr", el).value || 0, 0, 10);
         m.caught.ball = $("#n-ball", el).value; m.ab = monAbilities(m)[0];
         if (m.caught.ball && $("#n-ball-use", el).checked && S.bag[m.caught.ball]) { S.bag[m.caught.ball]--; if (!S.bag[m.caught.ball]) delete S.bag[m.caught.ball]; }
         addMon(m);
@@ -1936,8 +1969,8 @@ function openWild(i) {
   const bst = enc.hp + enc.atk + enc.def + enc.spd, lim = obedCap(statsAll().obedience);
   const n = NATURES.find((x) => x.name === enc.nature);
   modal(`A wild ${enc.sp} appeared!`, `
-    <div class="row">${sprite(enc.sp, "lg")}</div>
-    <div class="row">${enc.types.map(typeChip).join(" ")}${enc.gender ? `<span class="pill">${enc.gender === "F" ? "♀" : "♂"}</span>` : ""}${enc.shiny ? `<span class="pill good">✦ Shiny!</span>` : ""}${enc.mark ? `<span class="pill accent">${esc(enc.mark)}</span>` : ""}</div>
+    <div class="row">${sprite(enc.sp, "lg", enc.shiny)}${enc.mark ? `<div class="mon-title">${esc(enc.sp)} ${esc(markTitle(enc.mark))}</div>` : ""}</div>
+    <div class="row">${enc.types.map(typeChip).join(" ")}${enc.gender ? `<span class="pill">${enc.gender === "F" ? "♀" : "♂"}</span>` : ""}${enc.shiny ? `<span class="pill good">✦ Shiny!</span>` : ""}${enc.mark ? `<span class="pill accent">${esc(enc.mark)}</span>` : ""}<span class="pill">${esc(enc.nature)}</span></div>
     <div class="statline"><div class="st"><span>HP</span><b>${enc.hp}</b></div><div class="st"><span>ATK</span><b>d${enc.atk}</b></div><div class="st"><span>DEF</span><b>${enc.def}</b></div><div class="st"><span>SPD</span><b>${enc.spd}</b></div><div class="st"><span>BST</span><b>${bst}</b></div></div>
     <div class="small">Ability: <b>${esc(enc.ability)}</b>${enc.hasHidden ? ` + Hidden <b>${esc(enc.abilities[1])}</b>` : ""} · Nature: <b>${esc(enc.nature)}</b>${n && n.likes !== "N/A" ? ` (likes ${n.likes}, dislikes ${n.dislikes})` : ""}</div>
     ${bst > lim ? `<div class="reminder"><b>Over your catch limit.</b> Base Stat Total ${bst} is more than ${lim}. You can battle it but not catch it.</div>` : ""}
@@ -2039,7 +2072,7 @@ function contestCheck(B) {
   const foeN = B.sides.foe.trainer.name;
   if (C.pts.me <= 0 || C.pts.foe <= 0) { const win = C.pts.foe <= 0 && C.pts.me > 0; B.over = win ? "win" : "loss"; C.result = win ? `${foeN} ran out of Contest Points.` : "You ran out of Contest Points."; }
   else if (C.turns.me >= 5 && C.turns.foe >= 5) {
-    if (C.pts.me === C.pts.foe) { B.over = "end"; C.result = `Time's up: tied at ${C.pts.me} points. Settle it with a roll-off.`; }
+    if (C.pts.me === C.pts.foe) { let a, b; do { a = rnd(20); b = rnd(20); } while (a === b); B.over = a > b ? "win" : "loss"; C.result = `Time's up: tied at ${C.pts.me} points. Roll-off d20: you ${a}, ${foeN} ${b}.`; }
     else { B.over = C.pts.me > C.pts.foe ? "win" : "loss"; C.result = `Time's up: ${C.pts.me} to ${C.pts.foe}.`; }
   }
   if (B.over) B.log.push(C.result);
@@ -2132,9 +2165,10 @@ function battleFinish(res) {
     log("win", `Beat ${B.kind === "wild" ? "a wild " + activeOf(B, "foe")[0].name : foeName}${pr ? " and won " + money(pr) : ""}.`);
     if (B.isGym) { const g = GYMS.find((x) => x.town === B.loc); if (g && !(S.awards[g.id] || {}).on) after = () => openAward(g.id, frIds); }
     if (B.isBrain) { const f = FRONTIER.find((x) => x.town === B.loc); if (f && !(S.awards[f.id] || {}).on) after = () => openAward(f.id, frIds); }
-    if (B.contest) { const h = B.contest.hall; log("ribbon", `Won the ${B.contest.type} Contest at ${B.loc}.`); if (h && !(S.awards[h] || {}).on) after = () => openAward(h, frIds, B.contest.type); else if (!h) toast("No Contest Hall here, so no Ribbon was added."); }
-  } else if (res === "loss" && B.contest) { log("loss", `Lost the ${B.contest.type} Contest battle to ${foeName}.`);
+    if (B.contest) { const h = B.contest.hall; if (h) S.lastHall = h; log("ribbon", `Won the ${B.contest.type} Contest at ${B.loc}.`); if (h && !(S.awards[h] || {}).on) after = () => openAward(h, frIds, B.contest.type); else if (!h) toast("No Contest Hall here, so no Ribbon was added."); }
+  } else if (res === "loss" && B.contest) { if (B.contest.hall) S.lastHall = B.contest.hall; log("loss", `Lost the ${B.contest.type} Contest battle to ${foeName}.`);
   } else if (res === "loss") {
+    if (B.isGym || B.isBrain) { const L = LOCMAP.get(B.loc), ev = L && L.ev.find((e) => (B.isGym ? / Gym$/ : /^The Battle \w+$/).test(e.t)); if (ev) S.events[eventKey(L.n, ev)] = "failed"; }
     if (B.sides.foe.trainer.hasTrainer && B.kind !== "pvp") { const pay = Math.min(S.money, Math.max(100, pointsSpent() * 100)); S.money -= pay; log("loss", `Lost to ${foeName} and paid ${money(pay)}.`); }
     else log("loss", `Lost to ${B.kind === "wild" ? "a wild " + (activeOf(B, "foe")[0] || {}).name : foeName}.`);
   } else if (res === "fled") log("note", `A wild ${(activeOf(B, "foe")[0] || {}).name} got away.`);
@@ -2436,9 +2470,9 @@ document.addEventListener("click", (e) => {
     case "ev-view": UI.ev = { loc: el.dataset.loc, i: +el.dataset.i }; S.tab = "events"; save(); render(); window.scrollTo(0, 0); break;
     case "bmode": UI.bmode = el.dataset.v; render(); break;
     case "contest-setup": UI.bmode = "contest"; UI.contest = Object.assign(UI.contest || { mon: (partyMons()[0] || {}).id || "", nums: [] }, { type: el.dataset.type }); S.tab = "battle"; save(); render(); window.scrollTo(0, 0); break;
-    case "ct-roll": { const C = UI.contest, n = []; while (n.length < 3) { const r = rnd(10); if (!n.includes(r)) n.push(r); } C.nums = n; toast(`Rolled ${n.join(", ")}`); render(); break; }
+    case "ct-roll": { const C = UI.contest, n = []; while (n.length < 3) { const r = rnd(10); if (!n.includes(r)) n.push(r); } C.nums = n; C.ro = {}; toast(`Rolled ${n.join(", ")}`); render(); break; }
     case "ct-start": startContestBattle(); break;
-    case "ct-lost": log("event", `Entered the ${UI.contest.type} Contest at ${S.loc} but didn't make the Battle Round.`); commit("Logged"); break;
+    case "ct-lost": { const h = HALLS.find((x) => x.town === S.loc); if (h) S.lastHall = h.id; } log("event", `Entered the ${UI.contest.type} Contest at ${S.loc} but didn't make the Battle Round.`); commit("Logged"); break;
     case "cpt": snap(B); contestLose(B, el.dataset.side, "adjusted by hand"); contestCheck(B); save(); render(); break;
     case "ev-undo": delete S.events[el.dataset.k]; commit(); break;
     case "collect": { const n = el.dataset.name; S.collected[S.loc + "|" + n] = true; const fix = ITEM_FIX[n.toLowerCase()]; if (/^5 Pok|×5/.test(n)) addItem("Poké Ball", 5, `Picked up 5 Poké Balls.`); else addItem(fix || n, 1, `Picked up ${n} at ${S.loc}.`); commit(`${n} added to your Bag`); break; }
@@ -2482,9 +2516,9 @@ document.addEventListener("change", (e) => {
   else if (c === "bw") { B.weather = el.value; B.weatherTurns = 0; save(); render(); }
   else if (c === "bt") { B.terrain = el.value; B.terrainTurns = 0; save(); render(); }
   else if (c === "fab") { const f = findF(B, el.dataset.k); f.ability = el.value; f.entered = false; onEnter(B, f).forEach((m) => B.log.push(m)); save(); render(); }
-  else if (c === "ct-type") { UI.contest.type = el.value; render(); }
-  else if (c === "ct-mon") { UI.contest.mon = el.value; render(); }
-  else if (c === "ct-num") { const k = +el.dataset.k, v = +el.value || 0, C = UI.contest; const n = [0, 1, 2].map((i) => C.nums[i] || 0); if (v && n.some((x, i) => x === v && i !== k)) { toast("Pick a different participant"); render(); return; } n[k] = v; C.nums = n; render(); }
+  else if (c === "ct-type") { UI.contest.type = el.value; UI.contest.ro = {}; render(); }
+  else if (c === "ct-mon") { UI.contest.mon = el.value; UI.contest.ro = {}; render(); }
+  else if (c === "ct-num") { const k = +el.dataset.k, v = +el.value || 0, C = UI.contest; const n = [0, 1, 2].map((i) => C.nums[i] || 0); if (v && n.some((x, i) => x === v && i !== k)) { toast("Pick a different participant"); render(); return; } n[k] = v; C.nums = n; C.ro = {}; render(); }
   else if (c.startsWith("qc-")) {
     const k = c.slice(3), v = el.type === "checkbox" ? el.checked : el.value;
     if ((k === "a" || k === "d") && v === "__dex") { dexPicker("Pick a Pokémon", (sp) => { UI.calc[k] = "d:" + sp; closeModal(); render(); }); return; }
@@ -2498,17 +2532,19 @@ document.addEventListener("input", (e) => {
 document.addEventListener("toggle", (e) => { const d = e.target; if (d.dataset && d.dataset.det) UI.mapShow[d.dataset.det] = d.open; }, true);
 function openEventResult(locName, i) {
   const L = LOCMAP.get(locName), x = evList(L)[i]; if (!x) return;
-  const e = x.e, k = x.k;
+  const e = x.e, k = x.k, comp = x.comp;
   const contest = e.t.match(/^(Beauty|Cool|Cute|Clever|Tough) Contest$/);
-  const hall = contest && HALLS.find((h) => h.town === L.n);
+  const [okT, noT] = comp ? COMP_TXT[comp.kind] : ["Passed", "Failed"];
   modal(e.t, `<div class="muted small">${esc(L.n)}${e.r ? " · " + esc(e.r) : ""}</div><div>How did it go?</div>
-    <div class="row"><button class="btn primary" data-er="passed">Passed</button><button class="btn danger" data-er="failed">Failed</button><button class="btn ghost" data-act="modal-close">Cancel</button></div>
-    <div class="tiny muted">${x.rep ? "This event can be repeated, so it stays open." : "It moves to Already happened."}</div>`, (m) => m.addEventListener("click", (ev) => {
-    const b = ev.target.closest("[data-er]"); if (!b) return;
-    const r = b.dataset.er; S.events[k] = r;
-    if (r === "passed") log("event", `Passed ${e.t} at ${L.n}.`); else log("fail", `Failed ${e.t} at ${L.n}.`);
-    closeModal(); commit(r === "passed" ? "Event passed" : "Event failed");
-    if (r === "passed" && hall && !(S.awards[hall.id] || {}).on) openAward(hall.id, null, contest[1]);
+    <div class="row"><button class="btn primary" data-er="passed">${okT}</button><button class="btn danger" data-er="failed">${comp ? "Lost · " + noT : noT}</button><button class="btn ghost" data-act="modal-close">Cancel</button></div>
+    <div class="tiny muted">${comp && comp.kind === "contest" ? "One Ribbon per Hall. After a loss you must enter a contest at a different Hall before coming back." : comp ? "You can challenge again later." : x.rep ? "This event can be repeated, so it stays open." : "It moves to Already happened."}</div>`, (m) => m.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-er]"); if (!btn) return;
+    const r = btn.dataset.er;
+    if (comp && comp.kind === "contest") S.lastHall = comp.id;
+    if (comp) { if (r === "failed") S.events[k] = "failed"; else delete S.events[k]; } else S.events[k] = r;
+    if (r === "passed") log("event", `${comp ? okT.replace(" Obtained", "") + " won at" : "Passed " + e.t + " at"} ${L.n}.`); else log("fail", `${comp ? "Lost " + e.t : "Failed " + e.t} at ${L.n}.`);
+    closeModal(); commit(r === "passed" ? okT : noT);
+    if (r === "passed" && comp && !(S.awards[comp.id] || {}).on) openAward(comp.id, null, contest ? contest[1] : undefined);
   }));
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && MODAL) closeModal(); });
