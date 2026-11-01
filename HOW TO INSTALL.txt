@@ -1,0 +1,35 @@
+POKÉMON OPAL COMPANION — HOW TO INSTALL (Android + Windows)
+
+The app needs to live at a web address once so phones and PCs can install it.
+After that it works offline and opens from its own icon.
+
+1) PUT IT ONLINE (free, one time, about 5 minutes) — GitHub Pages
+   a. Make a free account at github.com and sign in.
+   b. Click "+" (top right) > New repository. Name it opal-companion. Set it to Public. Click Create repository.
+   c. On the new repo page click "uploading an existing file".
+   d. Drag in EVERYTHING inside this folder (index.html, manifest.webmanifest, sw.js, and the fonts and icons folders).
+      Click Commit changes.
+   e. Go to Settings > Pages. Under "Branch" choose main and / (root), then Save.
+   f. Wait a minute. Your app's address is:  https://YOUR-USERNAME.github.io/opal-companion/
+
+2) INSTALL ON ANDROID
+   Open the address in Chrome > tap the ⋮ menu > "Install app" (or "Add to Home screen") > Install.
+   The Opal icon lands on your home screen and opens full screen, even with no signal.
+
+3) INSTALL ON WINDOWS
+   Edge: open the address > ⋯ menu > Apps > "Install this site as an app".
+   Chrome: open the address > click the install icon at the right end of the address bar.
+   It shows up in the Start menu and can be pinned to the taskbar.
+
+4) YOUR SAVE
+   Each device keeps its own save. To move or back up a journey:
+   ⚙ Settings > Download save file, then on the other device ⚙ Settings > Load save file.
+   (The save code copy/paste in Settings works too.)
+
+5) GETTING UPDATES
+   When you get a new version, upload the new files to the same repo (replace the old ones).
+   Installed apps pick up the update the next time they open online (close and reopen once).
+
+NO-INTERNET OPTION (Windows only)
+   Double-click index.html to open it in your browser. Everything works and saves in that browser,
+   but it won't install as an app or have its own icon.
