@@ -3145,8 +3145,15 @@ function miniB(a, d) { return { sides: { me: { trainer: myTrainer(), active: [0]
 /* ---------- PokéRinger ---------- */
 // PokéRinger: one ring on a 60-space course, a post at each end. The ring starts in the middle.
 // Every turn the acting Pokémon pulls the ring its Speed toward its own post; whoever the ring is closer to holds it.
-const RING_LEN = 60; let RING_CHASE = 2; // the chaser flies half its Speed
-function ringSync(R) { R.me.d = R.r; R.foe.d = RING_LEN - R.r; if (R.r < RING_LEN / 2) R.holder = "me"; else if (R.r > RING_LEN / 2) R.holder = "foe"; }
+const RING_LEN = 60; let RING_CHASE = 2, RING_WEIGHT = 2; // the chaser flies half its Speed; the ring holder flies Speed −2 (min 3)
+// possession flips when the ring is pulled across the middle onto the chaser's half (or on a critical hit)
+function ringSync(R, before) {
+  R.me.d = R.r; R.foe.d = RING_LEN - R.r;
+  const half = (r) => r < RING_LEN / 2 ? "me" : r > RING_LEN / 2 ? "foe" : "";
+  const ch = R.holder === "me" ? "foe" : "me";
+  if (half(R.r) === ch && half(before) !== ch) R.holder = ch;
+}
+const ringFly = (R, side) => R.holder === side ? Math.max(3, R[side].spd - RING_WEIGHT) : Math.ceil(R[side].spd / RING_CHASE);
 function startRinger(L, i, m) {
   const t = L.tr[i], r = t.m[0], s = monStats(m);
   const me = { name: monName(m), sp: m.sp, types: s.types, hp: s.hp, atk: s.atk, def: s.def, spd: s.spd, ab: m.ab || "", d: RING_LEN / 2 };
@@ -3165,19 +3172,24 @@ function ringerAct(side, act) {
     const B = side === "me" ? miniB(fa, fd) : miniB(fd, fa);
     const ty = a.types.map((x) => [x, typeMult(x, o.types)]).sort((p, q) => q[1] - p[1])[0][0];
     const res = resolveAttack(B, fa, fd, { attType: ty });
-    if (res.hit && res.dmg) { R.r = Math.max(0, Math.min(RING_LEN, R.r + dir * res.dmg)); R.log.push(`${a.name} attacks ${o.name} (${cap(ty)}): hit for ${res.dmg} — the ring is knocked ${res.dmg} spaces toward ${side === "me" ? "your" : "their"} post.`); }
+    if (res.hit && (res.crit || res.total >= 2 * o.def)) {
+      R.holder = side; R.me.d = R.r; R.foe.d = RING_LEN - R.r;
+      R.log.push(res.crit ? `${a.name} lands a critical hit on ${o.name} (d20 ${res.nat}) and snatches the ring! ${a.name} goes again.` : `${a.name}'s attack roll of ${res.total} is double ${o.name}'s DEF ${o.def} — it snatches the ring! ${a.name} goes again.`);
+      return; // same Pokémon takes another turn straight away
+    }
+    if (res.hit && res.dmg) { const b0 = R.r; R.r = Math.max(0, Math.min(RING_LEN, R.r + dir * res.dmg)); ringSync(R, b0); R.log.push(`${a.name} attacks ${o.name} (${cap(ty)}): hit for ${res.dmg} — the ring is knocked ${res.dmg} spaces toward ${side === "me" ? "your" : "their"} post.`); }
     else R.log.push(`${a.name} attacks ${o.name}: ${res.hit ? "no effect" : "miss"} (d20 ${res.nat}, ${res.total} vs ${res.need}).`);
   }
-  const was = R.holder, fly = R.holder === side ? a.spd : Math.ceil(a.spd / RING_CHASE);
+  const was = R.holder, fly = ringFly(R, side), before = R.r;
   R.r = Math.max(0, Math.min(RING_LEN, R.r + dir * fly));
-  ringSync(R);
+  ringSync(R, before);
   R.log.push(`${a.name} flies ${fly} spaces — ${a.name} is ${a.d} from its post, ${o.name} is ${o.d} from theirs.`);
   if (R.holder !== was) R.log.push(`${R[R.holder].name} takes the ring!`);
-  if (R.r <= 0 || R.r >= RING_LEN) { const w = R.r <= 0 ? "me" : "foe"; R.holder = w; R.over = w === "me" ? "win" : "loss"; R.log.push(`${R[w].name} reaches the post with the ring!`); return; }
+  if ((R.r <= 0 && R.holder === "me") || (R.r >= RING_LEN && R.holder === "foe")) { const w = R.holder; R.holder = w; R.over = w === "me" ? "win" : "loss"; R.log.push(`${R[w].name} reaches the post with the ring!`); return; }
   const next = side === "me" ? "foe" : "me";
   if (next === R.first) R.round++;
   R.turn = next;
-  if (R.round > 60) { R.over = R.r < RING_LEN / 2 ? "win" : R.r > RING_LEN / 2 ? "loss" : (R.holder === "me" ? "win" : "loss"); R.log.push("Time's up."); }
+  if (R.round > 60) { R.over = R.holder === "me" ? "win" : "loss"; R.log.push(`Time's up — ${R[R.holder].name} has the ring.`); }
 }
 function ringerFoeTurn() {
   const R = S.ringer; if (!R || R.turn !== "foe" || R.over) return;
@@ -3191,9 +3203,9 @@ function vRinger() {
       <div class="row small" style="justify-content:space-between"><span>${sprite(me.sp, "xs")} ${esc(me.name)} · SPD ${me.spd} · <b>${me.d}</b> to go</span><span>${esc(f.name)} · SPD ${f.spd} · <b>${f.d}</b> to go ${sprite(f.sp, "xs")}</span></div>
       <div class="small"><span class="pill accent">${esc(h.name)} has the ring</span></div></div>
     ${R.over ? `<div class="result ${R.over === "win" ? "hit" : "miss"}">${R.over === "win" ? "You win!" : "You lost"}</div><button class="btn primary" data-act="rg-done">Done</button>`
-      : R.turn === "me" ? `<div class="row"><b>${esc(me.name)}'s turn</b>${R.holder !== "me" ? `<button class="btn primary" data-act="rg-attack">Attack ${esc(f.name)} &amp; fly ${Math.ceil(me.spd / RING_CHASE)}</button>` : `<button class="btn primary" data-act="rg-move">Fly ${me.spd} spaces</button><span class="tiny muted">The ring holder can't attack.</span>`}</div>`
+      : R.turn === "me" ? `<div class="row"><b>${esc(me.name)}'s turn</b>${R.holder !== "me" ? `<button class="btn primary" data-act="rg-attack">Attack ${esc(f.name)} &amp; fly ${ringFly(R, "me")}</button>` : `<button class="btn primary" data-act="rg-move">Fly ${ringFly(R, "me")} spaces</button><span class="tiny muted">The ring holder can't attack.</span>`}</div>`
       : `<div class="row"><b>${esc(f.name)}'s turn</b><button class="btn primary" data-act="rg-foe">Play their turn</button></div>`}
-    <div class="tiny muted">The ring starts in the middle, ${RING_LEN / 2} spaces from each post. Each turn the ring holder pulls the ring its full Speed toward its own post, and the chaser pulls it back half its Speed — if you're 20 from your post, they're 40 from theirs. Whoever the ring is closer to holds it. The chaser can also attack before it flies; a hit knocks the ring back toward the chaser's post by the damage. First to bring the ring to its post wins.</div>
+    <div class="tiny muted">The ring starts in the middle, ${RING_LEN / 2} spaces from each post. Each turn the ring holder pulls the ring toward its own post by its Speed −2 (the ring is heavy; never below 3), and the chaser pulls it back by half its Speed — if you're 20 from your post, they're 40 from theirs. Pull the ring past the middle and it's yours. The chaser can also attack before it flies; a hit knocks the ring back toward the chaser's post by the damage, and a critical hit — or an attack roll of at least double the holder's DEF — snatches the ring outright and gives the attacker another turn straight away. First to bring the ring to its post wins.</div>
   </section><section class="card"><div class="card-h"><h2>Log</h2><button class="btn sm ghost danger" data-act="rg-quit">Forfeit</button></div><div class="blog">${R.log.slice().reverse().map((l) => `<div>${esc(l)}</div>`).join("")}</div></section>`;
 }
 function ringerDone() {
@@ -3204,10 +3216,17 @@ function ringerDone() {
 
 /* ---------- Pokémon Baccer ---------- */
 const BG = 11, GOAL = [5, 5];
-const BACCER = { def: 13, passRule: false, dmgGte: true, passDmg: false, turnLimit: 40, diag: true, move: 3 };
+const BACCER = { def: 15, passRule: false, dmgGte: true, passDmg: false, turnLimit: 40, diag: true, move: 3 };
 const cheb = (a, b) => BACCER.diag ? Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])) : Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
 const inLine = (a, b) => a[0] === b[0] || a[1] === b[1] || Math.abs(a[0] - b[0]) === Math.abs(a[1] - b[1]);
 const CORNERS = [[0, 0], [10, 0], [0, 10], [10, 10]];
+// squares the ball crosses between two points (not including either end)
+function bPath(a, b) { const out = []; let x = a[0], y = a[1]; while (x !== b[0] || y !== b[1]) { if (BACCER.diag) { x += Math.sign(b[0] - x); y += Math.sign(b[1] - y); } else if (x !== b[0]) x += Math.sign(b[0] - x); else y += Math.sign(b[1] - y); if (x !== b[0] || y !== b[1]) out.push([x, y]); } return out; }
+// first Pokémon standing in the ball's path, if any
+function bBlocker(a, b) { for (const c of bPath(a, b)) { const q = bAt(c[0], c[1]); if (q) return q; } return null; }
+// shot target: 15 from 5 spaces out, 1 lower for every space closer (11 right next to the goal)
+const bShotNeed = (d) => BACCER.def - Math.max(0, 5 - d);
+const bLetter = (x, y) => `${String.fromCharCode(65 + x)}${y + 1}`;
 function bPieces() { const G = S.baccer; return G.me.map((p, i) => ({ p, side: "me", i })).concat(G.foe.map((p, i) => ({ p, side: "foe", i }))); }
 function bAt(x, y) { return bPieces().find((q) => q.p.x === x && q.p.y === y) || null; }
 const bFree = (x, y) => x >= 0 && y >= 0 && x < BG && y < BG && !(x === GOAL[0] && y === GOAL[1]) && !bAt(x, y);
@@ -3236,7 +3255,12 @@ function bShoot() {
   const G = S.baccer, side = G.ball.side, h = bHolder(), d = cheb([h.x, h.y], GOAL);
   const r = rnd(20), tot = r + G.bonus;
   if (BACCER.passRule && G.needPass === side) { G.log.push(`${h.name} needs to make a pass before shooting.`); return; }
-  if (tot < BACCER.def) { G.log.push(`${h.name} shoots: d20 ${r}${G.bonus ? " + " + G.bonus + " passes" : ""} = ${tot} vs ${BACCER.def} — misses the ball.`); return bTurnover(side, [h.x, h.y]); }
+  const blk = bBlocker([h.x, h.y], GOAL);
+  if (blk) {
+    if (blk.side !== side) { bGiveBall(blk.side, blk.i, `${h.name} shoots, but ${blk.p.name} is in the way and steals the ball!`); return; }
+    bGiveBall(side, blk.i, `${h.name} shoots, but ${blk.p.name} is in the way — the ball stops with ${blk.p.name}.`); return;
+  }
+  const need = bShotNeed(d); if (tot < need) { G.log.push(`${h.name} shoots from ${d} out: d20 ${r}${G.bonus ? " + " + G.bonus + " passes" : ""} = ${tot} vs ${need} — misses the ball.`); return bTurnover(side, [h.x, h.y]); }
   const dmg = rnd(h.atk) + (BACCER.passDmg ? G.bonus : 0);
   if (BACCER.dmgGte ? dmg >= d : dmg > d) {
     G.score[side]++;
@@ -3257,6 +3281,11 @@ function bTurnover(side, pt) {
 function bPass(ti) {
   const G = S.baccer, side = G.ball.side, other = side === "me" ? "foe" : "me";
   const h = bHolder(), rcv = G[side][ti];
+  const blk = bBlocker([h.x, h.y], [rcv.x, rcv.y]);
+  if (blk) {
+    if (blk.side !== side) { bGiveBall(blk.side, blk.i, `${h.name} passes to ${rcv.name}, but ${blk.p.name} is in the way and steals it!`); return; }
+    G.ball = { side, i: blk.i }; G.log.push(`${h.name} passes to ${rcv.name}, but ${blk.p.name} is in the way and catches it.`); return;
+  }
   const roll = rnd(20);
   const stealer = G[other].map((p, i) => ({ p, i })).filter(({ p }) => cheb([p.x, p.y], [rcv.x, rcv.y]) <= 1 && p.def > roll).sort((a, b) => b.p.def - a.p.def)[0];
   if (stealer) { bGiveBall(other, stealer.i, `${h.name} passes to ${rcv.name} (d20 ${roll}) — ${stealer.p.name} steals it (DEF ${stealer.p.def})!`); return; }
@@ -3267,53 +3296,117 @@ function bPass(ti) {
   p.x = spot[0]; p.y = spot[1];
   bGiveBall(other, j, `${h.name} passes to ${rcv.name}: d20 ${roll} doesn't beat ATK ${rcv.atk}. ${p.name} cuts in and takes the ball.`);
 }
+const bTackleOdds = (t, c) => Math.max(0, Math.min(1, (20 - Math.max(0, c.atk + 10 - t.def)) / 20));
+function bTackle(side, i) {
+  const G = S.baccer, t = G[side][i], c = bHolder(), r = rnd(20), tot = r + t.def, need = c.atk + 10;
+  if (tot > need) bGiveBall(side, i, `${t.name} tackles ${c.name}: d20 ${r} + DEF ${t.def} = ${tot} beats ${need} — ${t.name} steals the ball!`);
+  else G.log.push(`${t.name} tackles ${c.name}: d20 ${r} + DEF ${t.def} = ${tot} vs ${need} — ${c.name} keeps the ball.`);
+}
+function bDribble(x, y) { const G = S.baccer, h = bHolder(); G.log.push(`${h.name} dribbles to ${bLetter(x, y)}.`); h.x = x; h.y = y; }
 function bMove(side, i, x, y) { const G = S.baccer, p = G[side][i]; G.log.push(`${p.name} moves to ${String.fromCharCode(65 + x)}${y + 1}.`); p.x = x; p.y = y; }
 function bEndTurn() {
-  const G = S.baccer; G.sel = null; G.mvLeft = BACCER.move; if (G.over) return;
+  const G = S.baccer; G.sel = null; G.mvLeft = BACCER.move; G.act1 = null; if (G.over) return;
   G.turns++; G.turn = G.turn === "me" ? "foe" : "me";
   if (G.turns >= (BACCER.turnLimit || 300)) { G.over = G.score.me > G.score.foe ? "win" : G.score.me < G.score.foe ? "loss" : "draw"; G.log.push(`Full time after ${G.turns} turns: ${G.score.me}–${G.score.foe}.`); }
+}
+// two actions a turn: first Move / Dribble / Pass, then Pass (if you haven't) or Shoot. Shooting and tackling end the turn.
+const bCanMove = (G) => !G.act1 || G.act1 === "move";
+const bCanPass = (G) => G.act1 !== "pass";
+const bFirst = (G) => !G.act1;
+// after an action: returns true if the same side can still act this turn
+function bAfter(kind, side) {
+  const G = S.baccer; if (G.over) return false;
+  if (kind === "shoot" || kind === "tackle") return false;
+  const has = G.ball.side === side;
+  if (kind === "pass") { if (!has || G.act1) return false; G.act1 = "pass"; return true; }
+  if (kind === "dribble") { G.act1 = "dribble"; return true; }
+  if (kind === "move") { G.act1 = "move"; return has || (G.mvLeft ?? BACCER.move) > 0; }
+  return false;
 }
 // AI: decide the computer's action without applying it
 function bFoePlan() {
   const G = S.baccer;
   const scan = (skipBall, score) => { let best = null; G.foe.forEach((p, i) => { if (skipBall && G.ball.side === "foe" && i === G.ball.i) return; for (let dx = -BACCER.move; dx <= BACCER.move; dx++) for (let dy = -BACCER.move; dy <= BACCER.move; dy++) { const x = p.x + dx, y = p.y + dy; if (cheb([0, 0], [dx, dy]) > BACCER.move || !bFree(x, y)) continue; const sc = score(p, x, y); if (!best || sc < best.sc) best = { k: "move", i, x, y, sc }; } }); return best; };
+  if (G.act1) {
+    if (G.ball.side !== "foe") return { k: "end" };
+    const h = bHolder(), d = cheb([h.x, h.y], GOAL);
+    const pHit = Math.max(0, Math.min(1, (21 - (bShotNeed(d) - G.bonus)) / 20)), pDmg = Math.max(0, (h.atk - d) / h.atk);
+    const clear = (to) => { const q = bBlocker([h.x, h.y], to); return !q || q.side === "foe"; };
+    if (pHit * pDmg >= 0.15 && clear(GOAL)) return { k: "shoot", i: G.ball.i };
+    if (bCanPass(G)) {
+      const o = G.foe.map((p, i) => ({ p, i })).filter(({ p, i }) => i !== G.ball.i && inLine([h.x, h.y], [p.x, p.y]) && clear([p.x, p.y]) && cheb([p.x, p.y], GOAL) < d && (20 - p.atk) / 20 >= 0.4).sort((a, b) => cheb([a.p.x, a.p.y], GOAL) - cheb([b.p.x, b.p.y], GOAL))[0];
+      if (o) return { k: "pass", i: G.ball.i, to: o.i };
+    }
+    if (pHit * pDmg >= 0.1 && clear(GOAL)) return { k: "shoot", i: G.ball.i };
+    return { k: "end", i: G.ball.i };
+  }
   if (G.ball.side === "foe") {
     const h = bHolder(), d = cheb([h.x, h.y], GOAL);
     const must = G.needPass === "foe";
-    const pHit = Math.max(0, Math.min(1, (21 - (BACCER.def - G.bonus)) / 20)), pDmg = Math.max(0, (h.atk - d) / h.atk);
-    if (!must && pHit * pDmg >= 0.18) return { k: "shoot", i: G.ball.i };
-    let opts = G.foe.map((p, i) => ({ p, i })).filter(({ p, i }) => i !== G.ball.i && inLine([h.x, h.y], [p.x, p.y]) && cheb([p.x, p.y], GOAL) < d && (20 - p.atk) / 20 >= 0.45);
-    if (!opts.length && must) opts = G.foe.map((p, i) => ({ p, i })).filter(({ p, i }) => i !== G.ball.i && inLine([h.x, h.y], [p.x, p.y]));
+    const pHit = Math.max(0, Math.min(1, (21 - (bShotNeed(d) - G.bonus)) / 20)), pDmg = Math.max(0, (h.atk - d) / h.atk);
+    const clear = (to) => { const q = bBlocker([h.x, h.y], to); return !q || q.side === "foe"; };
+    if (!must && pHit * pDmg >= 0.18 && clear(GOAL)) return { k: "shoot", i: G.ball.i };
+    let opts = G.foe.map((p, i) => ({ p, i })).filter(({ p, i }) => i !== G.ball.i && inLine([h.x, h.y], [p.x, p.y]) && clear([p.x, p.y]) && cheb([p.x, p.y], GOAL) < d && (20 - p.atk) / 20 >= 0.45);
+    if (!opts.length && must) opts = G.foe.map((p, i) => ({ p, i })).filter(({ p, i }) => i !== G.ball.i && inLine([h.x, h.y], [p.x, p.y]) && clear([p.x, p.y]));
     if (opts.length) { opts.sort((a, b) => cheb([a.p.x, a.p.y], GOAL) - cheb([b.p.x, b.p.y], GOAL)); return { k: "pass", i: G.ball.i, to: opts[0].i }; }
     const best = scan(true, (p, x, y) => cheb([x, y], GOAL) * 2 - (inLine([h.x, h.y], [x, y]) ? (must ? 40 : 6) : 0) + (must && inLine([h.x, h.y], [p.x, p.y]) ? 99 : 0));
+    // dribble one space if it sets up a good, clear shot
+    let drib = null;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const x = h.x + dx, y = h.y + dy; if ((dx || dy) && bFree(x, y)) { const nd = cheb([x, y], GOAL), q = bBlocker([x, y], GOAL), v = Math.max(0, Math.min(1, (21 - (bShotNeed(nd) - G.bonus)) / 20)) * Math.max(0, (h.atk - nd) / h.atk) - (q && q.side === "me" ? 1 : 0) - (G.me.some((m) => cheb([m.x, m.y], [x, y]) <= 1) ? 0.05 : 0); if (nd < d && (!drib || v > drib.v)) drib = { k: "dribble", i: G.ball.i, x, y, v }; } }
+    if (drib && drib.v >= 0.12 && !must) return drib;
     if (best && (must || pHit * pDmg < 0.1)) return best;
     if (must) return { k: "hold", i: G.ball.i };
+    if (!clear(GOAL)) return drib || best || { k: "hold", i: G.ball.i };
     return { k: "shoot", i: G.ball.i };
   }
   const h = bHolder(), tgt = [h.x + Math.sign(GOAL[0] - h.x), h.y + Math.sign(GOAL[1] - h.y)];
-  return scan(true, (p, x, y) => cheb([x, y], tgt)) || { k: "none" };
+  // tackle if someone is next to the ball carrier with a fair chance
+  const tk = G.foe.map((p, i) => ({ p, i, o: bTackleOdds(p, h) })).filter(({ p, o }) => cheb([p.x, p.y], [h.x, h.y]) <= 1 && o >= 0.3).sort((a, b) => b.o - a.o)[0];
+  if (tk) return { k: "tackle", i: tk.i };
+  // otherwise step into the shooting lane, or next to the carrier
+  const lane = bPath([h.x, h.y], GOAL);
+  return scan(true, (p, x, y) => (lane.some((c) => c[0] === x && c[1] === y) ? -3 : 0) + cheb([x, y], tgt)) || { k: "none" };
 }
 function bFoeApply(pl) {
   const G = S.baccer;
   if (pl.k === "shoot") bShoot();
   else if (pl.k === "pass") bPass(pl.to);
   else if (pl.k === "move") bMove("foe", pl.i, pl.x, pl.y);
+  else if (pl.k === "tackle") bTackle("foe", pl.i);
+  else if (pl.k === "dribble") bDribble(pl.x, pl.y);
   else if (pl.k === "hold") G.log.push(`${G.tn} holds the ball.`);
-  bEndTurn();
+  else if (pl.k === "end") G.log.push(`${G.tn} ends their turn.`);
+  if (pl.k === "move") G.mvLeft = 0; // the computer spends its moves on one Pokémon
+  const more = ["move", "dribble", "pass"].includes(pl.k) && bAfter(pl.k, "foe") && G.ball.side === "foe";
+  if (!more) bEndTurn();
+  return more;
 }
 // instant version (used by simulations)
-function bFoeTurn() { const G = S.baccer; if (!G || G.turn !== "foe" || G.over || G.phase !== "play") return; bFoeApply(bFoePlan()); }
+function bFoeTurn() { const G = S.baccer; if (!G || G.turn !== "foe" || G.over || G.phase !== "play") return; if (bFoeApply(bFoePlan())) bFoeApply(bFoePlan()); }
 // animated computer turn (~5 seconds): select → show options → choose → act
 let BANIM = null, BANIM_SCALE = 1;
 const bBusy = () => !!(BANIM && BANIM.G === S.baccer);
 function bFoeGo() {
   const G = S.baccer; if (!G || G.turn !== "foe" || G.over || G.phase !== "play" || bBusy()) return;
   const pl = bFoePlan(), A = BANIM = { G, pl, stage: "sel", i: pl.i };
-  const p = pl.i != null ? G.foe[pl.i] : null;
+  const p = pl.i != null && pl.k !== "end" ? G.foe[pl.i] : null;
   const at = (ms, fn) => setTimeout(() => { if (BANIM !== A || S.baccer !== G) return; fn(); render(); }, ms * BANIM_SCALE);
-  const finish = (ms) => { at(ms, () => { bFoeApply(pl); A.stage = "done"; A.msg = G.log[G.log.length - 1] || ""; save(); }); at(ms + 900, () => { BANIM = null; }); };
-  if (!p) { A.msg = `${G.tn} has no move.`; render(); return finish(1200); }
-  A.msg = `${G.tn} selects ${p.name}${pl.k === "move" ? "" : " (the ball carrier)"}.`; render();
+  let more = false;
+  const finish = (ms) => { at(ms, () => { more = bFoeApply(pl); A.stage = "done"; A.msg = G.log[G.log.length - 1] || ""; save(); }); at(ms + 900, () => { BANIM = null; if (more) bFoeGo(); }); };
+  if (pl.k === "end") { A.msg = `${G.tn} ends their turn.`; render(); return finish(900); }
+  if (!p && pl.k !== "end") { A.msg = `${G.tn} has no move.`; render(); return finish(1200); }
+  A.msg = `${G.tn} selects ${p.name}${pl.k === "move" || pl.k === "tackle" ? "" : " (the ball carrier)"}.`; render();
+  if (pl.k === "tackle") {
+    const c = bHolder();
+    at(1200, () => { A.stage = "target"; A.carrier = true; A.msg = `${p.name} goes in for a tackle on ${c.name}!`; });
+    return finish(2800);
+  }
+  if (pl.k === "dribble") {
+    at(1200, () => { A.stage = "range"; A.msg = `${p.name} looks to dribble…`; });
+    at(2300, () => { A.stage = "target"; A.msg = `${p.name} dribbles to ${bLetter(pl.x, pl.y)}.`; });
+    at(3200, () => { A.stage = "moving"; A.pos = [pl.x, pl.y]; });
+    return finish(3900);
+  }
   if (pl.k === "move") {
     at(1200, () => { A.stage = "range"; A.msg = `${p.name} looks at where it can move…`; });
     at(2400, () => { A.stage = "target"; A.msg = `${p.name} heads for ${String.fromCharCode(65 + pl.x)}${pl.y + 1}.`; });
@@ -3346,17 +3439,33 @@ function bCell(x, y) {
     return;
   }
   if (G.turn !== "me") return;
+  const next = (kind) => { if (bAfter(kind, "me")) { if (G.ball.side === "me" && kind !== "move") G.sel = G.ball.i; return; } bEndTurn(); bFoeGo(); };
   if (q && q.side === "me") {
     if (G.sel != null && G.ball.side === "me" && G.sel === G.ball.i && q.i !== G.ball.i) {
-      if ((G.mvLeft ?? BACCER.move) < BACCER.move) { toast("You've moved this turn. End the turn to pass next time."); return; }
+      if (!bCanPass(G)) { toast("You've already passed this turn. Shoot or end your turn."); return; }
       const h = bHolder(); if (!inLine([h.x, h.y], [q.p.x, q.p.y])) { toast("Passes go in a straight or diagonal line."); return; }
-      bPass(q.i); bEndTurn(); bFoeGo(); return;
+      bPass(q.i); next("pass"); return;
     }
     G.sel = q.i; return;
   }
+  if (q && q.side === "foe" && G.sel != null && G.ball.side === "foe" && q.i === G.ball.i) {
+    const t = G.me[G.sel];
+    if (cheb([t.x, t.y], [q.p.x, q.p.y]) > 1) { toast("Tackles need to be next to the ball carrier."); return; }
+    if (!bFirst(G)) { toast("Tackling takes your whole turn."); return; }
+    bTackle("me", G.sel); next("tackle"); return;
+  }
+  if (G.sel != null && G.ball.side === "me" && G.sel === G.ball.i) {
+    const h = bHolder();
+    if (cheb([h.x, h.y], [x, y]) === 1 && bFree(x, y)) {
+      if (!bFirst(G)) { toast("Dribbling has to be your first action."); return; }
+      bDribble(x, y); next("dribble");
+    }
+    return;
+  }
   if (G.sel != null && !(G.ball.side === "me" && G.sel === G.ball.i)) {
+    if (!bCanMove(G)) { toast("Moving has to be your first action."); return; }
     const p = G.me[G.sel], left = G.mvLeft ?? BACCER.move, d = cheb([p.x, p.y], [x, y]);
-    if (d <= left && bFree(x, y)) { bMove("me", G.sel, x, y); G.mvLeft = left - d; if (G.mvLeft <= 0) { bEndTurn(); bFoeGo(); } }
+    if (d <= left && bFree(x, y)) { bMove("me", G.sel, x, y); G.mvLeft = left - d; if (G.mvLeft <= 0 && G.ball.side !== "me") { bEndTurn(); bFoeGo(); } else G.act1 = "move"; }
   }
 }
 function bKickoff() {
@@ -3374,8 +3483,9 @@ function vBaccer() {
     if (!sel) return "";
     if (G.phase === "setup") return bFree(x, y) ? "mv" : "";
     if (!my) return "";
-    if (isHolderSel) { const q = bAt(x, y); return !moved && q && q.side === "me" && q.i !== G.ball.i && inLine([sel.x, sel.y], [x, y]) ? "ps" : ""; }
-    return cheb([sel.x, sel.y], [x, y]) <= (G.mvLeft ?? BACCER.move) && bFree(x, y) ? "mv" : "";
+    if (isHolderSel) { const q = bAt(x, y); if (bCanPass(G) && q && q.side === "me" && q.i !== G.ball.i && inLine([sel.x, sel.y], [x, y])) return "ps"; return bFirst(G) && cheb([sel.x, sel.y], [x, y]) === 1 && bFree(x, y) ? "mv" : ""; }
+    if (bFirst(G) && G.ball.side === "foe") { const c = bHolder(); if (x === c.x && y === c.y && cheb([sel.x, sel.y], [x, y]) <= 1) return "ps"; }
+    return bCanMove(G) && cheb([sel.x, sel.y], [x, y]) <= (G.mvLeft ?? BACCER.move) && bFree(x, y) ? "mv" : "";
   };
   const A = bBusy() ? BANIM : null, ap = A && A.pl.i != null && A.stage !== "done" ? G.foe[A.pl.i] : null;
   const pieceAt = (x, y) => {
@@ -3386,8 +3496,10 @@ function vBaccer() {
     if (!ap) return "";
     const px = A.pos ? A.pos[0] : ap.x, py = A.pos ? A.pos[1] : ap.y, cls = [];
     if (x === px && y === py) cls.push("fsel");
-    if (A.pl.k === "move") {
-      if (A.stage === "range" || A.stage === "target") { if (cheb([ap.x, ap.y], [x, y]) <= BACCER.move && bFree(x, y)) cls.push("mv"); }
+    if (A.pl.k === "tackle") { const c = bHolder(); if (A.stage === "target" && x === c.x && y === c.y) cls.push("tgt"); }
+    if (A.pl.k === "move" || A.pl.k === "dribble") {
+      const rng = A.pl.k === "dribble" ? 1 : BACCER.move;
+      if (A.stage === "range" || A.stage === "target") { if (cheb([ap.x, ap.y], [x, y]) <= rng && bFree(x, y)) cls.push("mv"); }
       if ((A.stage === "target" || A.stage === "moving") && x === A.pl.x && y === A.pl.y) cls.push("tgt");
     } else if (A.pl.k === "pass") {
       const q = bAt(x, y);
@@ -3395,7 +3507,7 @@ function vBaccer() {
       if (A.stage === "target" && q && q.side === "foe" && q.i === A.pl.to) cls.push("tgt");
     } else if (A.pl.k === "shoot") {
       if ((A.stage === "range" || A.stage === "target") && x === GOAL[0] && y === GOAL[1]) cls.push("tgt");
-      if (A.stage === "range" && inLine([ap.x, ap.y], GOAL) && cheb([x, y], GOAL) + cheb([x, y], [ap.x, ap.y]) === cheb([ap.x, ap.y], GOAL) && !(x === ap.x && y === ap.y) && !(x === GOAL[0] && y === GOAL[1])) cls.push("lane");
+      if (A.stage === "range" && bPath([ap.x, ap.y], GOAL).some((c) => c[0] === x && c[1] === y)) cls.push("lane");
     }
     return cls.join(" ");
   };
@@ -3411,11 +3523,11 @@ function vBaccer() {
     ${G.over ? `<div class="result ${G.over === "win" ? "hit" : "miss"}">${G.over === "win" ? "You win!" : G.over === "draw" ? "It's a draw" : "You lost"}</div><button class="btn primary" data-act="bc-done">Done</button>`
       : G.phase === "setup" ? `<div class="small">Set up: tap one of your Pokémon, then a square to place it.${G.ball.side === "me" ? " The Pokémon with the ball must start in a corner." : ""}</div><button class="btn primary" data-act="bc-kick">Kick off</button>`
       : A ? `<div class="bc-anim"><span class="pill t-foe-pill">${esc(G.tn)}</span> ${esc(A.msg || "")}</div>`
-      : my ? `<div class="small"><b>Your turn.</b> ${sel ? (isHolderSel ? "Tap a teammate in a straight or diagonal line to pass, or shoot." : `Tap a highlighted square to move. You have ${left} of ${BACCER.move} spaces left this turn to split between your Pokémon.`) : `Tap one of your Pokémon. Each turn either move (${BACCER.move} spaces to split between your Pokémon) or pass or shoot.`}</div>
-        <div class="row">${isHolderSel && G.needPass === "me" ? `<span class="pill warn">Make a pass before you can shoot</span>` : ""}${moved ? `<span class="pill">${left} move${left === 1 ? "" : "s"} left</span><button class="btn primary" data-act="bc-end">End turn</button>` : ""}${isHolderSel && !moved && G.needPass !== "me" ? `<button class="btn primary" data-act="bc-shoot">Shoot (d20${G.bonus ? "+" + G.bonus : ""} ≥ ${BACCER.def}, then d${h.atk} ≥ ${d})</button>` : ""}${moved ? "" : `<button class="btn ghost sm" data-act="bc-skip">Skip turn</button>`}</div>`
+      : my ? `<div class="small"><b>Your turn${G.act1 ? " — second action" : ""}.</b> ${G.act1 ? `You ${G.act1 === "move" ? "moved" : G.act1 === "dribble" ? "dribbled" : "passed"}. ${G.ball.side === "me" ? (bCanPass(G) ? "Now pass or shoot" : "Now shoot") + " with the ball carrier, or end your turn." : ""}${G.act1 === "move" && left > 0 ? ` You can still move ${left} more space${left === 1 ? "" : "s"}.` : ""}` : ""} ${sel ? (isHolderSel ? `${bCanPass(G) ? "Tap a teammate in a straight or diagonal line to pass. " : ""}${bFirst(G) ? "Tap a square next to you to dribble 1 space. " : ""}Anyone standing in the ball's path gets it.` : bCanMove(G) ? `Tap a highlighted square to move (${left} of ${BACCER.move} spaces left to split between your Pokémon).${bFirst(G) && G.ball.side === "foe" && cheb([sel.x, sel.y], [bHolder().x, bHolder().y]) <= 1 ? ` Or tap ${esc(bHolder().name)} to tackle (d20 + DEF ${sel.def} must beat ${bHolder().atk + 10}).` : ""}` : "") : G.act1 ? "" : `Tap one of your Pokémon. You get two actions: move, dribble or pass first, then pass or shoot. Tackling or shooting ends your turn.`}</div>
+        <div class="row">${G.act1 === "move" ? `<span class="pill">${left} move${left === 1 ? "" : "s"} left</span>` : ""}${isHolderSel && G.needPass !== "me" ? `<button class="btn primary" data-act="bc-shoot">Shoot (d20${G.bonus ? "+" + G.bonus : ""} ≥ ${bShotNeed(d)}, then d${h.atk} ≥ ${d})</button>` : ""}${G.act1 ? `<button class="btn" data-act="bc-end">End turn</button>` : `<button class="btn ghost sm" data-act="bc-skip">Skip turn</button>`}</div>`
       : A ? `<div class="bc-anim"><span class="pill t-foe-pill">${esc(G.tn)}</span> ${esc(A.msg || "")}</div>`
       : `<div class="row"><b>${esc(G.tn)}'s turn</b><button class="btn primary" data-act="bc-foe">Play their turn</button></div>`}
-    <details class="tiny muted"><summary>Rules</summary>11×11 grid with the goal in the centre square. Each team gets 20 turns (40 in total); the most goals wins, a team reaching 3 goals wins straight away, and a level score is a tie. Each turn either move, pass, or shoot. Moving: 3 spaces per turn to split between your Pokémon however you like (one Pokémon 3 spaces, 2 and 1, or 1 each), in any direction, with diagonals counting as 1 space. Shots: d20 (+1 per completed pass) must reach 13, then the damage roll must equal or beat the spaces to the goal. Passes go in straight or diagonal lines: roll a d20 higher than the receiver's ATK. A defender next to the receiver with DEF higher than the pass roll steals it. A failed pass lets the opponent's nearest Pokémon cut in. The ball carrier can't move. After a goal the other team brings the ball back in from a corner. After a missed shot, the defending Pokémon closest to the shooter takes the ball.</details>
+    <details class="tiny muted"><summary>Rules</summary>11×11 grid with the goal in the centre square. Each team gets 20 turns (40 in total); the most goals wins, a team reaching 3 goals wins straight away, and a level score is a tie. Each turn you get two actions: first move, dribble or pass, then pass or shoot (you can't pass twice). Shooting or tackling ends your turn, and a tackle has to be your whole turn. Moving: 3 spaces per turn to split between your Pokémon however you like (one Pokémon 3 spaces, 2 and 1, or 1 each), in any direction, with diagonals counting as 1 space. Shots: d20 (+1 per completed pass) must reach 15 from 5 spaces out, 1 less for every space closer (11 next to the goal), then the damage roll must equal or beat the spaces to the goal. Passes go in straight or diagonal lines: roll a d20 higher than the receiver's ATK. A defender next to the receiver with DEF higher than the pass roll steals it. A failed pass lets the opponent's nearest Pokémon cut in. The ball carrier can't move, but can dribble 1 space instead of its turn's action. A Pokémon next to the opposing ball carrier can tackle as its turn's action: d20 + its DEF must beat the carrier's ATK + 10 to steal the ball. Any Pokémon standing in the path of a pass or shot gets the ball: an opponent steals it, a teammate catches it. After a goal the other team brings the ball back in from a corner. After a missed shot, the defending Pokémon closest to the shooter takes the ball.</details>
   </section><section class="card"><div class="card-h"><h2>Log</h2><button class="btn sm ghost danger" data-act="bc-quit">Forfeit</button></div><div class="blog">${G.log.slice().reverse().map((l) => `<div>${esc(l)}</div>`).join("")}</div></section>`;
 }
 function baccerDone() {
