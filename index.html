@@ -4471,7 +4471,7 @@ function partnerChoices() { const L = LOCMAP.get("Safari Zone"); return (L ? L.w
 function openNewRanger(fromDemo) {
   const towns = LOCS.filter((l) => l.k === "town");
   const ch = partnerChoices();
-  modal("Start as a Pokémon Ranger", `<div class="small muted">${fromDemo ? "This clears the example trainer." : "This replaces your current save. Download or copy your save first if you want to keep it."}</div>
+  modal("Start as a Pokémon Ranger", `<div class="seg" role="group" aria-label="Play as"><button data-act="new-trainer" aria-pressed="false">Pokémon Trainer</button><button aria-pressed="true">Pokémon Ranger</button></div><div class="small muted">${fromDemo ? "This clears the example trainer." : "This replaces your current save. Download or copy your save first if you want to keep it."}</div>
     <div class="grid2"><label class="f" for="nr-n">Ranger name<input id="nr-n" type="text" placeholder="Your name"></label><label class="f" for="nr-a">Age<input id="nr-a" type="text"></label>
     <label class="f" for="nr-h">Hometown<select id="nr-h">${COUNTIES.map((c) => `<optgroup label="${c} County">${towns.filter((t) => t.c === c).map((t) => `<option>${esc(t.n)}</option>`).join("")}</optgroup>`).join("")}</select></label>
     <label class="f" for="nr-m"${S.settings.view === "gm" ? "" : ' style="display:none"'}>Starting money (₽)<input id="nr-m" type="number" min="0" value="200"></label></div>
@@ -8278,7 +8278,7 @@ const RANGER_LETTER = [
   "Report to Ranger Headquarters, next to the Safari Zone. A Capture Styler is waiting for you, and so is a Partner Pokémon who is ready to meet you.",
 ];
 function openRangerLetter(fromDemo) {
-  modal("A letter for you", `<div class="letter">${IMGS.trainer && IMGS.trainer.Gentleman_FRLG_01 ? `<span class="tspr card letter-pic"><img src="${IMGS.trainer.Gentleman_FRLG_01}" alt="Ranger Leader Banjo"></span>` : ""}<div class="letter-h">&lt;Invitation&gt;</div>${RANGER_LETTER.map((t) => `<p>${esc(t)}</p>`).join("")}<div class="letter-sig">— Banjo, Ranger Leader, Austra Ranger Union</div><p class="letter-ps">P.S. I wore the uniform for forty years, and I'd still be out there if my knees would let me. These days I send the next Rangers out instead. I'm glad one of them is you.</p></div>
+  modal("A letter for you", `<div class="seg" role="group" aria-label="Play as"><button data-act="new-trainer" aria-pressed="false">Pokémon Trainer</button><button aria-pressed="true">Pokémon Ranger</button></div><div class="letter">${IMGS.trainer && IMGS.trainer.Gentleman_FRLG_01 ? `<span class="tspr card letter-pic"><img src="${IMGS.trainer.Gentleman_FRLG_01}" alt="Ranger Leader Banjo"></span>` : ""}<div class="letter-h">&lt;Invitation&gt;</div>${RANGER_LETTER.map((t) => `<p>${esc(t)}</p>`).join("")}<div class="letter-sig">— Banjo, Ranger Leader, Austra Ranger Union</div><p class="letter-ps">P.S. I wore the uniform for forty years, and I'd still be out there if my knees would let me. These days I send the next Rangers out instead. I'm glad one of them is you.</p></div>
     <button class="btn primary" data-letter-ok>Accept the invitation</button>`, (el) => $("[data-letter-ok]", el).addEventListener("click", () => { closeModal(); openNewRanger(fromDemo); }));
 }
 
@@ -9660,6 +9660,7 @@ document.addEventListener("click", (e) => {
     case "bc-done": baccerDone(); break;
     case "bc-quit": if (el.dataset.confirm) { S.baccer.over = "loss"; baccerDone(); } else { el.dataset.confirm = "1"; el.textContent = "Tap again to forfeit"; } break;
     case "new-ranger": closeModal(); openRangerLetter(S.demo); break;
+    case "new-trainer": closeModal(); openNewGame(S.demo); break;
     case "ms-open": openMissionResult(+el.dataset.i); break;
     case "ms-undo": delete rgr().missions[MISSIONS[+el.dataset.i].t]; commit(); break;
     case "cap-mission": { const m = MISSIONS[+el.dataset.i], x = missionMons(m)[+el.dataset.k]; startCapture(x, `Mission · ${m.t}`); break; }
