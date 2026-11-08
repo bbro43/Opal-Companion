@@ -2906,7 +2906,9 @@ function modal(title, body, onMount) {
   $("#modal-root").innerHTML = `<div class="scrim" data-act="modal-scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="icon-btn" data-act="modal-close" aria-label="Close">✕</button></div><div class="stack" id="modal-body">${body}</div></div></div>`;
   MODAL = { title };
   if (onMount) onMount($("#modal-body"));
-  const first = $("#modal-body input, #modal-body select, #modal-body button"); if (first && first.tagName !== "BUTTON") first.focus();
+  const first = $("#modal-body input, #modal-body select, #modal-body button"); // on a phone or tablet, don't jump into a text box (that pops the keyboard up); tap it when you want to type
+  const touch = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+  if (first && first.tagName !== "BUTTON" && !touch) first.focus();
 }
 function closeModal() {
   $("#modal-root").innerHTML = ""; MODAL = null;
