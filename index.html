@@ -2214,7 +2214,7 @@ function vTrainer() {
   <section class="card">
     <div class="card-h"><h2>Contest Ribbons</h2><span class="sub">3 points each · any stat · one per hall</span></div>
     <div class="awards">${HALLS.map((h) => awardBtn(h.id, h.town.replace(/ (City|Town)$/, ""), "Contest Hall", "hall")).join("")}</div>
-    <div class="row small"><span class="muted">Grand Festival needs 5+ Ribbons, one of each:</span>${RIBBON_TYPES.map((t) => `<span class="pill ${types.has(t) ? "good" : ""}">${awardIcon("ribbon:" + t, "pill-ico" + (types.has(t) ? "" : " off"))} ${t}</span>`).join("")}</div>
+    <div class="row small">${notesOn() ? `<span class="muted">Grand Festival needs 5+ Ribbons, one of each:</span>` : ""}${RIBBON_TYPES.map((t) => `<span class="pill ${types.has(t) ? "good" : ""}">${awardIcon("ribbon:" + t, "pill-ico" + (types.has(t) ? "" : " off"))} ${t}</span>`).join("")}</div>
     ${festivalWarning()}
   </section>
   <section class="card">
