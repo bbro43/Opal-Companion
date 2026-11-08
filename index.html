@@ -9921,7 +9921,13 @@ const musicVol = () => Math.max(0, Math.min(1, S && S.settings && S.settings.mus
 function musEl() {
   if (MUS.el) return MUS.el;
   const a = new Audio(); a.preload = "auto"; a.volume = musicVol();
-  a.addEventListener("ended", () => { const n = MUS.next; MUS.next = null; MUS.jingle = !!(n && n.jingle); if (n) musPlay(n.key, n); else { MUS.key = null; MUS.scene = ""; musicSync(); } });
+  // looping is done here rather than with the audio element's own loop setting, which some phones ignore:
+  // menu, location and battle music starts over when it ends; jingles hand back to the scene's music
+  a.addEventListener("ended", () => {
+    const n = MUS.next; MUS.next = null;
+    if (!n && MUS.loop && MUS.key) { a.currentTime = 0; const p = a.play(); if (p && p.catch) p.catch(() => {}); return; }
+    MUS.jingle = !!(n && n.jingle); if (n) musPlay(n.key, n); else { MUS.key = null; MUS.scene = ""; musicSync(); }
+  });
   return (MUS.el = a);
 }
 // start a track (opt.loop, opt.then = the track to roll into when this one ends)
@@ -9929,14 +9935,14 @@ function musPlay(key, opt = {}) {
   if (!musicOn()) return;
   const a = musEl();
   MUS.next = opt.then ? { key: opt.then, loop: opt.thenLoop !== false, jingle: !!opt.jingle } : null;
-  if (MUS.key === key && !a.paused && !opt.restart) { a.loop = !!opt.loop && !opt.then; return; }
+  if (MUS.key === key && !a.paused && !opt.restart) { MUS.loop = !!opt.loop && !opt.then; return; }
   MUS.key = key;
-  a.loop = !!opt.loop && !opt.then;
+  MUS.loop = !!opt.loop && !opt.then; a.loop = false;
   a.src = MUSIC_BASE + key + ".mp3";
   a.volume = musicVol();
   const p = a.play(); if (p && p.catch) p.catch(() => {});
 }
-function musStop() { if (MUS.el) { MUS.el.pause(); } MUS.key = null; MUS.scene = ""; MUS.next = null; MUS.jingle = false; }
+function musStop() { if (MUS.el) { MUS.el.pause(); } MUS.loop = false; MUS.key = null; MUS.scene = ""; MUS.next = null; MUS.jingle = false; }
 // a short tune, then back to whatever should be playing
 function musJingle(key) { if (!musicOn() || !MUS.unlocked) return; MUS.jingle = true; MUS.scene = "jingle:" + key; musPlay(key, { loop: false, restart: true }); }
 
@@ -10019,7 +10025,7 @@ let SPLASH_UP = false;
 function musicTitle(onPlay) {
   if (!musicOn()) return false;
   SPLASH_UP = true; MUS.unlocked = true; MUS.scene = "splash";
-  const a = musEl(); MUS.key = "title"; MUS.next = null; a.loop = true; a.src = MUSIC_BASE + "title.mp3"; a.volume = musicVol();
+  const a = musEl(); MUS.key = "title"; MUS.next = null; MUS.loop = true; a.loop = false; a.src = MUSIC_BASE + "title.mp3"; a.volume = musicVol();
   const p = a.play(); if (p && p.then) p.then(() => onPlay && onPlay()).catch(() => { MUS.unlocked = false; MUS.key = null; });
   return false;
 }
