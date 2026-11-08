@@ -881,7 +881,8 @@ function blankState() {
     trainer: { name: "", age: "", hometown: "", goal: "Champion", notes: "" },
     money: 0, awards: {}, mons: [], party: [], bag: {},
     loc: "Endigio Town", visited: {}, events: {}, beaten: {}, collected: {}, log: [],
-    settings: { levelOverride: null }, story: "", battle: null, enc: null, tab: "trainer",
+    // new-game defaults: music on at half volume, Classic battles, autoplay opponents, dice shown, story pages on, app notes off
+    settings: { levelOverride: null, music: true, musicVol: 0.5, dice: true, story: true, notes: false }, story: "", battle: null, enc: null, tab: "trainer",
   };
 }
 function lastSaved() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch (e) { return null; } }
@@ -7686,6 +7687,7 @@ function openStylerGame() {
    Every roll made while you play is collected; when the action finishes, the dice tumble and land on their results. */
 function diceRecord(n, v) {
   if (!S || !S.settings || (!S.settings.dice && !ROLL.force)) return;
+  if (navigator.webdriver && !UI.dice && !ROLL.force) return; // automated tests skip the animation
   ROLL.buf.push([n, v]);
   if (!ROLL.t) ROLL.t = setTimeout(() => { ROLL.t = null; const b = ROLL.buf; ROLL.buf = []; if (b.length) diceShow(b); }, 0);
 }
