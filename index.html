@@ -8494,6 +8494,8 @@ const styleShopBtn = () => isRanger() || !LOOK ? "" : [...new Set(styleShopsHere
 const groupLook = (g, cls = "card") => !g || !g.lk ? "" : g.lk.r ? (IMGS.trainer[g.lk.r] ? `<span class="tspr ${cls}"><img src="${IMGS.trainer[g.lk.r]}" alt=""></span>` : "") : LOOK ? lookImg(g.lk, cls) : "";
 
 // Professor Alder beside his lines in the Trainer intro
+// Professor Alder in the storybook style of Ranger Leader Banjo's letter
+const alderPage = (lines) => `<div class="letter">${IMGS.trainer && IMGS.trainer.Professor_Alder ? `<span class="tspr card letter-pic"><img src="${IMGS.trainer.Professor_Alder}" alt="Professor Alder"></span>` : ""}${lines.map((t) => `<p>${esc(t)}</p>`).join("")}<div class="letter-sig">— Professor Alder, Austra Region</div></div>`;
 const alderPic = () => IMGS.trainer && IMGS.trainer.Professor_Alder ? `<span class="tspr card speaker"><img src="${IMGS.trainer.Professor_Alder}" alt="Professor Alder"></span>` : "";
 // Ranger mode opens with an invitation letter from the Ranger Union
 const RANGER_LETTER = [
@@ -10538,8 +10540,7 @@ const INTRO2 = [
 const START_KEYS = ["Rotom Phone", "Pokédex", "Trainer ID", "Camping Gear", "Bag"];
 function openNewGame(fromDemo) {
   if (typeof musicPlace === "function") musicPlace("welcome");
-  modal("Professor Alder", `<div class="talk">${alderPic()}${INTRO.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
-    <div class="seg" role="group" aria-label="Play as"><button aria-pressed="true">Pokémon Trainer</button><button data-act="new-ranger" aria-pressed="false">Pokémon Ranger</button></div>
+  modal("Professor Alder", `<div class="seg" role="group" aria-label="Play as"><button aria-pressed="true">Pokémon Trainer</button><button data-act="new-ranger" aria-pressed="false">Pokémon Ranger</button></div>${alderPage(INTRO)}
     <button class="btn primary" data-ng-next>Tell him about yourself</button>`, (el) => $("[data-ng-next]", el).addEventListener("click", () => newGameForm(fromDemo)));
 }
 function newGameForm(fromDemo) {
@@ -10559,7 +10560,7 @@ function newGameForm(fromDemo) {
     }); });
 }
 function newGameStarter(info) {
-  modal("Professor Alder", `<div class="talk">${alderPic()}${INTRO2.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
+  modal("Professor Alder", `${alderPage(INTRO2)}
     <b>Choose your partner</b>
     <div class="grid3">${STARTERS.map((s, i) => { const d = dexFind(s); return `<label class="tile" style="cursor:pointer">${sprite(s, "lg")}<span><input type="radio" name="ng-s" value="${esc(s)}" ${i === 0 ? "checked" : ""}> ${esc(s.replace("Austran ", ""))}</span><span class="row">${d.types.map(typeChip).join(" ")}</span></label>`; }).join("")}</div>
     <div><button class="btn sm" type="button" data-ng-custom>Custom starter</button>
