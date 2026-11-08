@@ -2222,7 +2222,7 @@ function vPokemon() {
     ${S.mons.some((m) => m.dc) ? `<div class="small muted">At the Day Care: ${S.mons.filter((m) => m.dc).map((m) => `${esc(monName(m))} (${esc(m.dc)})`).join(", ")}</div>` : ""}
     ${list.length ? `<div class="stack">${list.map((m) => monCard(m)).join("")}</div>` : `<div class="empty">${UI.monTab === "party" ? "No Pokémon in your party yet." : "Your Box is empty. Pokémon you catch with a full party land here."}</div>`}
   </section>
-  <section class="card flat"><div class="small muted">The game suggests catching no more than about 10 Pokémon per playthrough (30 Pokédex slots counting evolutions). You have ${S.mons.length}.</div></section>`;
+`;
 }
 
 /* ---------------- Bag ---------------- */
