@@ -5709,10 +5709,10 @@ function foeStep(B) {
     if (RU.megaTwo) { if (!cur.mega && canMega(cur) && (B.megaN || 0) < 2) { megaEvolve(B, cur); B.megaN = (B.megaN || 0) + 1; } }
     else if (!B.gimmick.foe && !cur.mega && canMega(cur) && foeMegaPick(B) === cur) megaEvolve(B, cur);
     const ch = npcChoice(B, cur); if (!ch) return false;
-    // NPCs use a Z-Move when a capable Pokémon's HP falls below 25%
+    // NPCs use a Z-Move when a capable Pokémon's HP falls below 25% (the big trainers in zEarly use it on its first attack)
     let z = false;
     { const it = itemFind(cur.item) || {}, zt = it.cat === "Z-Crystal" && ((it.desc || "").match(/an? (\w+)-type/) || [])[1];
-      if (zt && !RU.noItems && !cur.zUsed && (!B.gimmick.foe || B.gimmick.foe === "Z-Move") && ((B.zCount || {}).foe || 0) < 3 && cur.hp > 0 && cur.hp < cur.maxHp * 0.25 && isType(cur, zt.toUpperCase())) { ch.ty = zt.toUpperCase(); z = true; } }
+      if (zt && !RU.noItems && !cur.zUsed && (!B.gimmick.foe || B.gimmick.foe === "Z-Move") && ((B.zCount || {}).foe || 0) < 3 && cur.hp > 0 && (zEarly(B, tn) || cur.hp < cur.maxHp * 0.25) && isType(cur, zt.toUpperCase())) { ch.ty = zt.toUpperCase(); z = true; } }
     performAttack(B, cur, ch.t, ch.ty, null, null, z, true);
     return true;
   }
@@ -5762,6 +5762,8 @@ function sendToCenter() {
 
 /* ---------- Dynamax / catching rules for opponents ---------- */
 // a trainer whose notes say "Dynamax: X" Dynamaxes X when it battles (the Gym Leader Rematch Aces in Wave County)
+// the Elite 4, Champions, Frontier Brains, Rivals and Gym Leader Rematches use their Z-Move on its first attack
+function zEarly(B, tn) { return /^(Elite|Champion|Grand Champion|Frontier Brain|Rival)/.test(tn || "") || (/^Gym Leader/.test(tn || "") && B.loc === "Endigio Town"); }
 function npcDmaxSp(B, tn) { const L = LOCMAP.get(B.loc), t = L && L.tr.find((x) => x.n === tn && /Dynamax:/.test(x.nt || "")); return t ? (/Dynamax:\s*([A-Z][\w’'.-]*(?: [A-Z][\w’'.-]*)?)/.exec(t.nt) || [])[1] || "" : ""; }
 function foeMayDmax(B) {
   const L = LOCMAP.get(B.loc); if (!L) return false;
