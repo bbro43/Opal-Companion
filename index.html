@@ -10247,6 +10247,8 @@ const EVENT_BADGE = {
 };
 // the Gym Leader offers the Badge; the player can accept it or decline it (and just enjoy the event)
 function eventBadge(town, why) {
+  // Rangers don't collect Badges: the event just passes
+  if (typeof isRanger === "function" && isRanger()) return false;
   const g = GYMS.find((x) => x.town === town); if (!g || (S.awards[g.id] || {}).on) return false;
   S.badgeOffer = { town, why: why || "" }; save();
   return true;
