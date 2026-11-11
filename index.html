@@ -2615,7 +2615,9 @@ function startTrainerBattle(locName, i, o2) {
       if (e1.t === "The Hitmon Challenge") { toast("Rent the Tyrogue from The Hitmon Challenge to take on the Blackbelts."); return; }
       if (reqStatus(e1) !== "now") { toast(`${e1.t} isn't open yet.`); return; }
       if (S.loc !== L.n) { toast(`Travel to ${L.n} first.`); return; }
-      return startEventRun(L.n, L.ev.indexOf(e1));
+      if (S.evRun && S.evRun.loc === L.n && S.evRun.i === L.ev.indexOf(e1)) return startEventRun(L.n, L.ev.indexOf(e1));
+      // a one-try event: say so before it starts
+      return modal(e1.t, `<div>${esc(t.n)} is part of <b>${esc(e1.t)}</b>. Battling starts the event: its battles run back to back, in the event's order, and you get one try.</div><div class="row"><button class="btn primary" data-e1go>Start the event</button><button class="btn ghost" data-act="modal-close">Not yet</button></div>`, (el) => $("[data-e1go]", el).addEventListener("click", () => { closeModal(); startEventRun(L.n, L.ev.indexOf(e1)); }));
     } }
   if (L.n === SHIP && /PokéRinger|Pokémon Baccer|Double Battles/.test(t.at)) { shipCompetitor(L, i); return; }
   let rows = t.m;
@@ -3379,7 +3381,7 @@ function travel(to, how) {
   if (S.safari && to !== S.loc) { log("event", `Left the Safari Zone: the Safari Game is over${S.safari.caught.length ? ` (caught ${S.safari.caught.join(", ")})` : ""}.`); S.safari = null; }
   if (S.loc === SHIP && to !== SHIP) { if (S.cruise) { endCruise("left early"); commit("Back in Melbouboro"); return; } to = PORT; }
   if (to === SHIP && S.loc !== SHIP && !boardShip()) { render(); return; }
-  if (to === "Subway" && S.loc !== "Subway" && subwayShut()) { toast(isRanger() ? "The Mafia has shut down the Subway. It reopens once you go up 2 Ranger Ranks." : "The Mafia has shut down the Subway. Earn 2 more Badges, Ribbons or Frontier Symbols to reopen it."); return; }
+  if (to === "Subway" && S.loc !== "Subway" && subwayShut()) { toast(isRanger() ? "The Mafia has shut down the Subway. It reopens once you go up 2 Ranger Ranks." : "The Mafia has shut down the Subway. Earn 2 more Badges, Ribbons, Notebooks or Frontier Symbols to reopen it."); return; }
   if (to === "Subway" && S.loc !== "Subway") {
     // the first ride is paid for by the Professor; every ride after costs ₽500
     if ((S.subwayRides || 0) > 0) {
@@ -3551,10 +3553,10 @@ function openCatch(B, enc) {
         if (inBattle && !/Heal Ball/.test(ball)) m.hp = t.hp >= monStats(m).hp ? null : t.hp;
         if (t.status && !/Heal Ball/.test(ball)) m.status = t.status;
         m.fr = clamp(m.fr, 0, 10);
-        if (B && B.evCatch) { log("catch", `Caught a ${m.sp} in a ${ball} for ${B.evCatch}.`); S.enc = null; B.over = "caught"; B.log.push(`${t.name} was caught for ${B.evCatch}!`); save(); closeModal(); render(); return; }
+        if (B && B.evCatch) { log("catch", `Caught ${/^[AEIOU]/.test(m.sp) ? "an" : "a"} ${m.sp} in a ${ball} for ${B.evCatch}.`); S.enc = null; B.over = "caught"; B.log.push(`${t.name} was caught for ${B.evCatch}!`); save(); closeModal(); render(); return; }
         if (src.item && !m.item) m.item = src.item;
         eggCrack(1); addMon(m); fishingCaught(m.sp, monStats(m).types, monBST(m));
-        log("catch", `Caught ${m.shiny ? "a shiny " : "a "}${m.sp} in a ${ball}${inBattle ? "" : " without battling"} at ${S.loc}.`);
+        log("catch", `Caught ${m.shiny ? "a shiny " : /^[AEIOU]/.test(m.sp) ? "an " : "a "}${m.sp} in a ${ball}${inBattle ? "" : " without battling"} at ${S.loc}.`);
         S.enc = null;
         if (B) { const rest = B.sides.foe.mons.filter((f) => f !== t && !f.fainted && !f.caught); if (rest.length && B.format === 2) { t.caught = true; t.fainted = true; t.hp = 0; B.log.push(`${t.name} was caught in a ${ball}! The battle goes on.`); advanceTurn(B, activeOf(B, "me")[0]); autoFoe(B); } else { B.over = "caught"; B.log.push(`${t.name} was caught in a ${ball}!`); } }
         save();
@@ -5899,7 +5901,7 @@ function eventOutcome(L, e, res) {
   S.flags = S.flags || {};
   if (e.t === "The Grand Bank Heist" && res === "failed") { S.flags.heistLost = true; log("note", "The Mafia got away with the money. Mafia Grunts now carry a Potion."); }
   outcomeX(L, e, res);
-  if (e.t === "The Subway Takeover" && res === "failed") { if (isRanger()) { S.flags.subwayShut = { rank: rangerRank() + 2 }; log("note", "The Mafia has taken the Subway. It's closed until you go up 2 Ranger Ranks."); } else { S.flags.subwayShut = awardList().length + 2; log("note", "The Mafia has taken the Subway. It's closed until you earn 2 more Badges, Ribbons or Frontier Symbols."); } }
+  if (e.t === "The Subway Takeover" && res === "failed") { if (isRanger()) { S.flags.subwayShut = { rank: rangerRank() + 2 }; log("note", "The Mafia has taken the Subway. It's closed until you go up 2 Ranger Ranks."); } else { S.flags.subwayShut = awardList().length + 2; log("note", "The Mafia has taken the Subway. It's closed until you earn 2 more Badges, Ribbons, Notebooks or Frontier Symbols."); } }
 }
 const subwayShut = () => { const f = S.flags && S.flags.subwayShut; if (!f) return false; if (typeof f === "object") return rangerRank() < f.rank; if (isRanger()) { S.flags.subwayShut = { rank: rangerRank() + 2 }; return true; } const need = f === true ? 2 : f; return awardList().length < need; };
 
@@ -6132,7 +6134,7 @@ function freeItems(L) {
 // events here that send you looking for wild Pokémon don't use up the route's 3 encounters
 function eventWildHere() {
   const L = LOCMAP.get(S.loc); if (!L) return [];
-  return evList(L).filter((x) => (x.st === "now" || x.st === "special") && !x.label && !x.comp && /\b(catch|caught|capture|wild|encounter|find)\b/i.test(x.e.d)).map((x) => x.e.t);
+  return evList(L).filter((x) => (x.st === "now" || x.st === "special") && !x.label && !x.comp && !/Fishing Challenge/.test(x.e.t) && /\b(catch|caught|capture|wild|encounter|find)\b/i.test(x.e.d)).map((x) => x.e.t);
 }
 
 // beating (or catching) every trainer and boss in an event passes it, even without "Start the event battles"
@@ -8152,7 +8154,6 @@ function concertTicket(L, e, k) {
   const d = [rnd(6), rnd(6), rnd(6), rnd(6)], num = d.join(""), win = !c.won && num === "3121";
   if (win) { c.won = true; addItem("Soothe Bell", 1, "Won the Soothe Bell raffle at Gage's concert."); }
   log("event", `Went to show ${c.shows} of Gage's charity concert. Ticket number ${num}.`);
-  if (c.shows >= 3) { S.events[k] = "passed"; eggCrack(1); log("event", `Passed ${e.t} at ${L.n}.`); }
   commit("Concert ticket");
   modal(e.t, `<div class="dice">${d.map((x) => `<div class="die"><b>${x}</b><span>d6</span></div>`).join("")}</div><div>Your ticket number is <b>${num}</b>. The winning number is <b>3121</b>.</div><div class="result ${win ? "hit" : "miss"}">${win ? "You won the raffle: a Soothe Bell!" : c.won ? "You already won the raffle. Enjoy the show!" : "Not this time. Enjoy the show!"}</div><div class="small muted">Show ${c.shows} of 3.</div>${c.shows >= 3 && !c.performed ? `<div class="small">Gage's opening act just cancelled. He asks you to perform!</div><button class="btn primary" data-perf>Perform</button>` : `<button class="btn primary" data-act="modal-close">OK</button>`}`, (el) => { const p = el.querySelector("[data-perf]"); if (p) p.addEventListener("click", () => { closeModal(); concertPerform(L, e, k); }); });
 }
@@ -8743,9 +8744,9 @@ function canTravel(to) {
 function mafiaMissSync() {
   if (!S || S.demo || isRanger()) return;
   S.flags = S.flags || {};
-  const chk = (loc, t, go) => { const L = LOCMAP.get(loc), e = L && L.ev.find((x) => x.t === t); if (!e) return; const k = eventKey(L.n, e); if (S.events[k] || S.flags["miss:" + t]) return; if (reqStatus(e) === "missed") { S.flags["miss:" + t] = 1; go(); } };
-  chk("Gold Coast City", "The Fake Pokémon Daycare Center", () => { S.flags.roadG01 = { lv: ownLevel() + 1 }; log("note", "No one stopped the Fake Daycare. The Mafia closed Route G01 east to Route C03 until your next Badge."); });
-  chk("Waga Town", "Attack on the Construction Site", () => { S.flags.towerLate = true; log("note", "No one stopped the Mafia at the Construction Site. Trainer Tower is delayed until 8 Badges."); });
+  const chk = (loc, t, go) => { const L = LOCMAP.get(loc), e = L && L.ev.find((x) => x.t === t); if (!e) return; const k = eventKey(L.n, e); if (S.flags["miss:" + t]) return; if (S.events[k] === "failed" || (!S.events[k] && reqStatus(e) === "missed")) { S.flags["miss:" + t] = 1; go(); } };
+  chk("Gold Coast City", "The Fake Pokémon Daycare Center", () => { S.flags.roadG01 = { lv: ownLevel() + 1 }; log("note", "The Fake Daycare got away with it. The Mafia closed Route G01 east to Route C03 until your next Badge."); });
+  chk("Waga Town", "Attack on the Construction Site", () => { S.flags.towerLate = true; log("note", "The Mafia got away from the Construction Site. Trainer Tower is delayed until 8 Badges."); });
 }
 // the Raid: Cufant the Copper Poachers sold end up as Copperajah on up to 5 Mafia teams that aren't full
 const RAID_COPPER = new WeakSet();
@@ -10281,8 +10282,8 @@ function concertPerform(L, e, k) {
   pickOneMon(e.t, "Gage's opening act cancelled, so you perform! Pick a Pokémon. Roll a d20: 14 or higher passes (+1 per Ribbon).", (m) => {
     const r = rnd(20), bonus = ribbonCount(), tot = r + bonus, ok = tot >= 14;
     c.performed = true;
-    if (ok) { payEventFr(m); eventBadge("Ballad Town", `${monName(m)} wowed the crowd. Gym Leader Gage was impressed`); }
-    else log("event", `Performed with ${monName(m)} at Gage's concert, but the crowd wasn't won over (${tot}).`);
+    if (ok) { S.events[k] = "passed"; eggCrack(1); payEventFr(m); log("event", `Passed ${e.t} at ${L.n}. ${monName(m)} wowed the crowd.`); eventBadge("Ballad Town", `${monName(m)} wowed the crowd`); }
+    else { S.events[k] = "failed"; log("fail", `Failed ${e.t} at ${L.n}: ${monName(m)}'s performance didn't win the crowd over (${tot}).`); }
     commit("Concert performance");
     modal(e.t, `${d20Box([r], `${r}${bonus ? ` + ${bonus} (Ribbons)` : ""} = <b>${tot}</b> · need 14`)}<div class="result ${ok ? "hit" : "miss"}">${ok ? "The crowd loved it! Gage gave you the Sound Badge." : "A tough crowd tonight. You can still battle Gage for the Badge."}</div><button class="btn primary" data-act="modal-close">OK</button>`);
   });
@@ -10320,14 +10321,16 @@ function hikersAfter(B, res) {
   const L = LOCMAP.get(B.hikers.loc), e = L && L.ev.find((x) => x.t === B.hikers.t); if (!e) return null;
   const k = eventKey(L.n, e);
   if (res !== "win") { S.events[k] = "failed"; log("fail", `Failed ${e.t} at ${L.n}: the Golem was too strong.`); return null; }
-  S.flags = S.flags || {}; S.flags.hikersGolem = true; save();
+  // the Pokémon that beat the Golem leads the rescue
+  const f = (B.sides.me.active || []).map((i) => B.sides.me.mons[i]).find((x) => x && !x.fainted) || B.sides.me.mons.find((x) => !x.fainted);
+  S.flags = S.flags || {}; S.flags.hikersGolem = f && f.monId ? f.monId : true; save();
   return () => hikersRoll(L, e, k);
 }
 function hikersRoll(L, e, k) {
-  const m = leadMon(), bonus = m && monStats(m).types.some((t) => t === "FLYING" || t === "GROUND") ? 2 : 0;
+  const fid = (S.flags || {}).hikersGolem, m = (typeof fid === "string" && S.mons.find((x) => x.id === fid)) || leadMon(), bonus = m && monStats(m).types.some((t) => t === "FLYING" || t === "GROUND") ? 2 : 0;
   const r = rnd(20), tot = r + bonus, ok = tot >= 10;
   delete S.flags.hikersGolem;
-  const html = `<div>The trail is clear. Now get the hikers down safely.</div>${d20Box([r], `${r}${bonus ? " + 2 (Flying or Ground lead)" : ""} = <b>${tot}</b> · need 10`)}<div class="result ${ok ? "hit" : "miss"}">${ok ? "Everyone made it down safely!" : "Rescuers had to take over."}</div>`;
+  const html = `<div>The trail is clear. Now get the hikers down safely.</div>${d20Box([r], `${r}${bonus ? ` + 2 (${esc(monName(m))} is Flying or Ground)` : ""} = <b>${tot}</b> · need 10`)}<div class="result ${ok ? "hit" : "miss"}">${ok ? "Everyone made it down safely!" : "Rescuers had to take over."}</div>`;
   if (ok) modal(e.t, html + `<button class="btn primary" data-hk>OK</button>`, (el) => $("[data-hk]", el).addEventListener("click", () => { closeModal(); procPass(L, e, k, m, "Rescued the stranded hikers on Cradle Mountain."); }));
   else { procFail(L, e, k, `Rolled ${tot}.`); modal(e.t, html + `<button class="btn primary" data-act="modal-close">OK</button>`); }
 }
