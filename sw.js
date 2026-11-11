@@ -1,5 +1,5 @@
 // Opal Companion offline cache. Bump VERSION whenever the app files change.
-const VERSION = "opal-2026-11-11g";
+const VERSION = "opal-2026-11-11h";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "maskable-512.png",
   "barlow-condensed-latin-500-normal.woff2", "barlow-condensed-latin-600-normal.woff2", "barlow-condensed-latin-700-normal.woff2",
   "nunito-sans-latin-400-normal.woff2", "nunito-sans-latin-600-normal.woff2", "nunito-sans-latin-700-normal.woff2", "nunito-sans-latin-800-normal.woff2",
