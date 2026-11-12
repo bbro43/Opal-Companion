@@ -2396,7 +2396,7 @@ function evCard(L, x) {
   const cls = { now: "now", special: "special", later: "later", past: /Passed|Obtained/.test(x.label) ? "done" : "missed" }[x.st];
   const n = eventTrainers(L, e).length;
   return `<div class="ev ${cls}"><div class="row between ev-head" data-act="ev-view" data-loc="${esc(L.n)}" data-i="${x.i}"><span class="t">${esc(e.t)} <span class="muted small">›</span>${isRanger() && !x.label ? (rangerEventCounts(eventKey(L.n, e)) ? ` <span class="pill good tiny">Counts for Rank</span>` : ` <span class="pill tiny">No Rank credit</span>`) : ""}</span>${x.label ? `<span class="pill ${ST_PILL[x.label]}">${x.label}</span>` : e.r ? `<span class="pill ${x.st === "now" ? "good" : x.st === "special" ? "warn" : ""}">${esc(reqLabel(e.r))}</span>` : `<span class="pill">Always open</span>`}</div>
-    <div class="d clamp">${playerView() && x.st === "later" ? "<i>Your GM will describe this.</i>" : esc(e.d)}</div>
+    <div class="d clamp">${playerView() && x.st === "later" ? "<i>Your GM will describe this.</i>" : esc(rgDesc(e.d))}</div>
     <div class="row">${evButtons(L, x)}<button class="btn sm ghost" data-act="ev-view" data-loc="${esc(L.n)}" data-i="${x.i}">Details${n ? ` · ${n} trainer${n === 1 ? "" : "s"}` : ""}</button></div></div>`;
 }
 function evButtonsBase(L, x) {
@@ -2450,7 +2450,7 @@ function vEvents() {
       <div class="row small"><span class="pill">${esc(L.n)}</span><span class="pill">${esc(L.c)} County</span>${e.r ? `<span class="pill">${esc(reqLabel(e.r))}</span>` : `<span class="pill">Always open</span>`}${/ Gym$/.test(e.t) && (S.awards[((GYMS.find((g) => g.town === L.n) || {}).id)] || {}).on ? `<span class="pill good">Badge earned</span>` : x.rep ? `<span class="pill accent">Repeatable</span>` : `<span class="pill">One attempt</span>`}</div>
       ${away ? `<div class="reminder">You're in ${esc(S.loc)}. Travel to ${esc(L.n)} to take part. ${canTravel(L.n) ? `<button class="btn sm" data-act="travel" data-to="${esc(L.n)}">Go to ${esc(L.n)}</button>` : `<button class="btn sm" data-act="map-open">Check map</button>`}</div>` : ""}
       ${e.t === "The Battle " + e.t.split(" ").pop() && FRONTIER_RULES[e.t] ? `<div class="reminder"><b>Battle rules:</b> ${esc(FRONTIER_RULES[e.t].note)} 6v6.${frontierOK() ? "" : " You need 8 Badges and to have competed in the Endigio League Conference, or to have competed in the Grand Festival, first."}</div>` : ""}
-      <p class="ev-text">${playerView() && x.st === "later" ? "<i>Your GM will describe this event.</i>" : esc(e.d)}</p>
+      <p class="ev-text">${playerView() && x.st === "later" ? "<i>Your GM will describe this event.</i>" : esc(rgDesc(e.d))}</p>
       <div class="row">${evButtons(L, x)}${!x.comp && !x.label && x.st === "now" && !away && toFight && !(L.n === "Endigio Town") && L.n !== "S.S. Margot" && e.t !== "The Hitmon Challenge" && (!OWN_STEPS.test(e.t) || (S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i)) ? `<button class="btn sm" data-act="ev-run" data-loc="${esc(L.n)}" data-i="${x.i}">${S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i ? `Resume the event battles (${S.evRun.list.length - S.evRun.pos} left)` : `Start the event battles (${toFight})`}</button>${S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i ? `<button class="btn sm ghost danger" data-act="ev-giveup">Give up the event</button>` : ""}` : ""}${contest ? `<button class="btn sm" data-act="contest-setup" data-type="${contest[1]}">Enter the ${contest[1]} Contest</button>${hall ? (hallWon ? `<span class="pill good">${esc(S.awards[hall.id].type)} Ribbon won here</span>` : "") : ""}` : ""}</div>
     </section>
     ${labOf(L, e) ? vResearch(labOf(L, e)) : ""}${vTournament(L, e)}
@@ -2492,7 +2492,7 @@ function trRow(L, t, i) {
   return `<div class="li ${av.ok ? "" : "dim"}">${trainerSprite(t.n, "row")}<div class="main"><div class="t">${esc(t.n)} ${size ? `<span class="pill">${size}v${size}</span>` : ""}${beat ? `<span class="pill good">Beaten</span>` : ""}${!av.ok && av.why !== "Beaten" ? `<span class="pill ${av.later ? "" : "warn"}">${esc(av.why)}</span>` : ""}</div>
     <div class="d">${/^\d+$/.test(t.at) ? "Contest Participant #" + esc(t.at) : esc(t.at)}${t.rw ? " · " + esc(t.rw) : ""} · ${(() => { const ts = trainerStats(L, t); return `Obedience ${ts.obedience}${t.g || t.x ? `, Grooming ${t.g}, Execution ${t.x}` : `, Intuition ${ts.intuition}, Will ${ts.will}`}${ts.intuition !== t.i ? " (5th Badge on: +1)" : ""}`; })()}${note ? " · " + note : ""}</div>
     ${playerView() ? `<div class="d"><i>${mons.length} Pokémon</i></div>` : `<div class="team">${mons.map((m) => sprite(m[0], "sm")).join("")}</div><div class="d">${mons.map((m) => esc(m[0]) + genderIcon(m[9], m[0])).join(", ")}</div>`}${t.nt ? `<div class="d"><i>${esc(t.nt)}</i></div>` : ""}</div>
-    ${isRanger() && rgBossRow(L, t) && !beat ? `<button class="btn sm primary" data-act="rg-boss" data-loc="${esc(L.n)}" data-i="${i}" ${av.ok ? "" : "disabled"}>Capture${t.m.length > 1 ? ` (${rgBossGot(L, t)}/${t.m.length})` : ""}</button>` : ""}${S.settings.view !== "gm" && oneTryEvent(L, t) && oneTryEvent(L, t).t === "The Hitmon Challenge" ? "" : `<button class="btn sm" data-act="battle-trainer" data-loc="${esc(L.n)}" data-i="${i}" ${(L.n === SHIP && !S.cruise) || !av.ok ? "disabled" : ""}>${L.n === SHIP ? ({ "PokéRinger": `Race · ${money(SHIP_FEE.ringer)}`, "Pokémon Baccer": `Play · ${money(SHIP_FEE.baccer)}`, "Double Battles": `Battle · ${money(SHIP_FEE.doubles)}` }[t.at] || "Battle") : "Battle"}</button>`}</div>`;
+    ${isRanger() && rgBossRow(L, t) && !beat ? `<button class="btn sm primary" data-act="rg-boss" data-loc="${esc(L.n)}" data-i="${i}" ${av.ok ? "" : "disabled"}>Capture${t.m.length > 1 ? ` (${rgBossGot(L, t)}/${t.m.length})` : ""}</button>` : ""}${S.settings.view !== "gm" && oneTryEvent(L, t) && oneTryEvent(L, t).t === "The Hitmon Challenge" ? "" : `<button class="btn sm" data-act="battle-trainer" data-loc="${esc(L.n)}" data-i="${i}" ${(L.n === SHIP && !S.cruise) || !av.ok || (isRanger() && (rangerNoFight(t, L) || (tev && rangerOff(L, tev)))) ? "disabled" : ""}>${L.n === SHIP ? ({ "PokéRinger": `Race · ${money(SHIP_FEE.ringer)}`, "Pokémon Baccer": `Play · ${money(SHIP_FEE.baccer)}`, "Double Battles": `Battle · ${money(SHIP_FEE.doubles)}` }[t.at] || "Battle") : "Battle"}</button>`}</div>`;
 }
 
 /* ---------------- Journal ---------------- */
@@ -4412,15 +4412,15 @@ const RSTATS = [
   { k: "intuition", n: "Intuition", g: "Battle", d: "Added to your Pokémon's Defense." },
   { k: "will", n: "Will", g: "Battle", d: "Full-HP Pokémon hit by a natural 20 that would faint: roll a d6, at or below Will it survives with 1 HP." },
 ];
-const R_PER_RANK = 2;
-// max points in one Ranger stat: 1 at Ranks 1–3, 2 at Ranks 4–6, 3 from Rank 7
-const rCap = (rank) => (rank >= 7 ? 3 : rank >= 4 ? 2 : 1);
+const R_PER_RANK = 3, R_STAT_CAP = 30;
+// max points in one Ranger stat: 2 at Ranks 1–4, then 4 (like a Trainer's 4th Badge)
+const rCap = (rank) => (rank >= 5 ? 4 : 2);
 function rAlloc() { const R = rgr(); return R.alloc || (R.alloc = {}); }
 function rStat(k) { return Object.values(rAlloc()).reduce((n, a) => n + a.filter((x) => x === k).length, 0); }
 function rStatsAll() { const o = {}; RSTATS.forEach((s) => (o[s.k] = rStat(s.k))); return o; }
 const rSpent = () => Object.values(rAlloc()).reduce((n, a) => n + a.length, 0);
 function rPendingRanks() {
-  const r = rangerRank(), out = []; let room = STAT_CAP - rSpent();
+  const r = rangerRank(), out = []; let room = R_STAT_CAP - rSpent();
   for (let k = 1; k <= r; k++) { const have = (rAlloc()[k] || []).length; const can = Math.min(R_PER_RANK - have, Math.max(0, room)); if (can > 0) { out.push([k, can]); room -= can; } }
   return out;
 }
@@ -4428,11 +4428,11 @@ function openRankPoints(rank) {
   const A = rAlloc(), saved = (A[rank] || []).slice(), cur = saved.slice(), base = rStatsAll();
   saved.forEach((k) => base[k]--);
   const gm = S.settings.view === "gm";
-  const maxPick = Math.min(R_PER_RANK, saved.length + Math.max(0, STAT_CAP - rSpent()));
+  const maxPick = Math.min(R_PER_RANK, saved.length + Math.max(0, R_STAT_CAP - rSpent()));
   // points are spent when the Rank is earned; the per-stat cap rises at Ranks 4 and 7
-  if (!gm && saved.length >= maxPick) { modal(`Rank ${rank} points`, `<div class="small">${saved.map((k) => RSTATS.find((x) => x.k === k).n).join(", ") || "No points (the 20-point cap was reached)."}</div><div class="tiny muted">Points are set when the Rank is earned.</div><button class="btn primary" data-act="modal-close">OK</button>`); return; }
+  if (!gm && saved.length >= maxPick) { modal(`Rank ${rank} points`, `<div class="small">${saved.map((k) => RSTATS.find((x) => x.k === k).n).join(", ") || "No points (the 30-point cap was reached)."}</div><div class="tiny muted">Points are set when the Rank is earned.</div><button class="btn primary" data-act="modal-close">OK</button>`); return; }
   const capR = rCap(rank);
-  const draw = () => `<div class="muted small">Rank ${rank} gives ${maxPick} point${maxPick === 1 ? "" : "s"}, each to a different stat. Max ${capR} per stat at Rank ${rank} (1 until Rank 4, 2 until Rank 7, then 3), 20 in total.</div>
+  const draw = () => `<div class="muted small">Rank ${rank} gives ${maxPick} point${maxPick === 1 ? "" : "s"}, each to a different stat. Max ${capR} per stat at Rank ${rank} (2 until Rank 5, then 4), 30 in total.</div>
     <div class="grid2">${RSTATS.map((x) => { const on = cur.includes(x.k), v = base[x.k] + (on ? 1 : 0); return `<button class="btn ${on ? "primary" : ""}" data-rp="${x.k}" ${!on && (base[x.k] >= capR || cur.length >= maxPick) ? "disabled" : ""}>${x.n} <span class="num">${v}/${capR}</span></button>`; }).join("")}</div>
     <button class="btn primary" data-rp-save>Assign points</button>`;
   const show = () => modal(`Rank ${rank} points`, draw(), (el) => {
@@ -4491,7 +4491,7 @@ function vMissions() {
 // Pokémon captured for a mission that's still under way stay on Standby
 function standbyKeep(m) { const R = rgr(), act = R.active ? chainOf(R.active) : null; return !!((act && (m.mtag === act || m.capFor === act)) || (m.mtag && chainOpen(m.mtag)) || (m.capFor && chainOpen(m.capFor))); }
 function releaseStandby(why) {
-  const st = standbyMons().filter((m) => !standbyKeep(m)); if (!st.length) return;
+  const st = standbyMons().filter((m) => !standbyKeep(m) && (m.sbUse || m.capFor)); if (!st.length) return; // unused helpers stay with you
   const ids = new Set(st.map((m) => m.id));
   S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => S.mons.some((m) => m.id === id));
   log("note", `${st.map(monName).join(", ")} returned to the wild${why ? " (" + why + ")" : ""}.`);
@@ -4499,7 +4499,7 @@ function releaseStandby(why) {
 function openMissionResult(i) {
   const m = MISSIONS[i];
   modal(m.t, `<div>How did it go?</div><div class="row"><button class="btn primary" data-mr="passed">Mission complete</button><button class="btn danger" data-mr="failed">Mission failed</button><button class="btn ghost" data-act="modal-close">Cancel</button></div>
-    <div class="tiny muted">Your Pokémon on Standby return to the wild when the mission ends.</div>`, (el) => el.addEventListener("click", (e) => {
+    <div class="tiny muted">Standby helpers you used on this mission return to the wild when it ends.</div>`, (el) => el.addEventListener("click", (e) => {
     const b = e.target.closest("[data-mr]"); if (!b) return;
     const before = rangerRank();
     rgr().missions[missionKey(m)] = b.dataset.mr;
@@ -4550,11 +4550,11 @@ function vRanger() {
 
 function vRangerStats() {
   const st = rStatsAll(), pend = rPendingRanks(), r = rangerRank();
-  return `<section class="card"><div class="card-h"><h2>Ranger stats</h2><span class="sub">${rSpent()}/${STAT_CAP} points used</span></div>
+  return `<section class="card"><div class="card-h"><h2>Ranger stats</h2><span class="sub">${rSpent()}/${R_STAT_CAP} points used</span></div>
     ${pend.length ? `<div class="reminder">You have points to assign. ${pend.map(([k, n]) => `<button class="btn sm primary" data-act="rp-open" data-r="${k}">Rank ${k}: ${n} point${n > 1 ? "s" : ""}</button>`).join(" ")}</div>` : ""}
     ${RSTATS.map((s) => `<div class="stat-row"><div class="stat-name">${s.n}<small>${s.g}</small></div><div><div class="pips">${[0, 1, 2, 3].map((i) => `<i class="pip ${i < st[s.k] ? "on c-catch" : ""}"></i>`).join("")}</div><div class="tiny muted" style="margin-top:3px">${esc(s.d)}</div></div><div class="big num" style="font-size:22px;text-align:right">${st[s.k]}</div></div>`).join("")}
     <details class="small"><summary>Points by Rank</summary>${Array.from({ length: r }, (_, i) => i + 1).map((k) => `<div class="row between"><span>Rank ${k}: ${(rAlloc()[k] || []).map((x) => RSTATS.find((s) => s.k === x).n).join(", ") || "<span class='muted'>not assigned</span>"}</span><button class="btn sm ghost" data-act="rp-open" data-r="${k}">Edit</button></div>`).join("")}</details>
-    <div class="tiny muted">Each Rank gives 2 points, one per stat. Max 1 in a stat at Ranks 1–3, 2 at Ranks 4–6 and 3 from Rank 7, and 20 in total.</div></section>`;
+    <div class="tiny muted">Each Rank gives 3 points, one per stat. Max 2 in a stat at Ranks 1–4, then 4, and 30 in total.</div></section>`;
 }
 /* ---------- capture ---------- */
 const ASSIST = {
@@ -4589,7 +4589,7 @@ function vCapture() {
       <div class="tile"><span class="lbl">Styler Energy</span><span class="big">${en}<span class="muted small">/${sty.energy}</span></span></div></div>
     <div class="row small">${C.steel ? `<span class="pill">Steel shield −${C.steel}</span>` : ""}${C.fire ? `<span class="pill">Fire: coin flip on a miss</span>` : ""}${C.fairy ? `<span class="pill">Fairy reroll ready</span>` : ""}${C.dark ? `<span class="pill">Dark: double 2d6</span>` : ""}${C.aType ? `<span class="pill">Styler type: ${cap(C.aType)}</span>` : ""}</div>
     <div class="row"><label class="f" for="cap-r" style="width:150px">Loops you rolled (blank = roll)<input id="cap-r" type="number" inputmode="numeric" placeholder="auto"></label>
-      ${C.pend ? `<button class="btn primary" data-act="cap-reroll">Use a Styler Reroll (${rgr().rerolls} left)</button><button class="btn" data-act="cap-miss">Take the miss</button>` : `<button class="btn primary" data-act="cap-throw" ${en > 0 ? "" : "disabled"}>Roll Loop Dice</button>`}<button class="btn primary sty-btn" data-act="sty-game" ${en > 0 && !C.pend ? "" : "disabled"}>${(IMGS.ui || {}).styler ? `<img src="${IMGS.ui.styler}" alt="">` : ""}Capture Styler</button><button class="btn ghost" data-act="cap-end">Let it go</button></div>
+      ${C.pend ? `<button class="btn primary" data-act="cap-reroll">Use a Styler Reroll (${rgr().rerolls} left)</button><button class="btn" data-act="cap-miss">Take the miss</button>` : `<button class="btn primary" data-act="cap-throw" ${en > 0 ? "" : "disabled"}>Roll Loop Dice</button>`}<button class="btn primary sty-btn" data-act="sty-game" ${en > 0 && !C.pend ? "" : "disabled"}>${(IMGS.ui || {}).styler ? `<img src="${IMGS.ui.styler}" alt="">` : ""}Capture Styler${en > 0 ? (C.pend ? " (pick reroll or miss first)" : "") : " (no Energy)"}</button>${en > 0 ? "" : `<div class="tiny muted">Your Styler is out of Energy. Recharge at Ranger Headquarters or any Pokémon Center.</div>`}<button class="btn ghost" data-act="cap-end">Let it go</button></div>
     ${en <= 0 ? `<div class="reminder">Your Styler is out of Energy. Recharge it before trying again.</div>` : ""}
   </section>
   <section class="card"><div class="card-h"><h2>Poké Assist</h2><span class="sub">Standby Pokémon return to the wild; your Partner can help once per capture</span></div>
@@ -5756,13 +5756,14 @@ function teamPick(o, go) {
 const hasPC = (L) => !!L && (L.poi || []).some((p) => /Pokémon Center|Pokemon Center/i.test(p[0]));
 function sendToCenter() {
   const to = isRanger() ? (typeof nearestCenter === "function" && nearestCenter(S.loc)) || "Ranger Headquarters" : S.lastPC && LOCMAP.get(S.lastPC) ? S.lastPC : "Endigio Town";
+  const allOut = partyMons().every((m) => m.egg || m.hp === 0);
   const shut = !isRanger() && typeof centersShut === "function" && centersShut();
   if (shut) { const hurt = partyMons().filter((m) => !m.egg && ((m.hp != null && m.hp < monStats(m).hp) || m.status)), n = Math.min(hurt.length, Math.floor((S.money || 0) / 500)); hurt.slice(0, n).forEach((m) => { m.hp = null; m.status = ""; }); S.money -= n * 500; const free = !n && hurt.length; if (free) { hurt[0].hp = null; hurt[0].status = ""; } S.mafiaMsg = free ? `Mafia Center: couldn't pay, so only ${monName(hurt[0])} was healed.` : `Mafia Center: ${n} of ${hurt.length} healed for ${money(n * 500)}.`; log("note", free ? `The Pokémon Centers are shut, so you went to a Mafia Center. You couldn't pay, so the grunt healed just your ${monName(hurt[0])} and sent you away.` : `The Pokémon Centers are shut, so you went to a Mafia Center: ${n} of ${hurt.length} Pokémon healed for ${money(n * 500)}.${n < hurt.length ? " You couldn't pay for the rest." : ""}`); }
   else partyMons().forEach((m) => { m.hp = null; m.status = ""; });
   if (isRanger()) { rgr().energy = styler().energy; if (S.evRun) { const R0 = S.evRun, L0 = LOCMAP.get(R0.loc), e0 = L0 && L0.ev[R0.i]; if (e0) { S.events[eventKey(L0.n, e0)] = "failed"; log("fail", `Failed ${e0.t}: your Pokémon were all knocked out.`); } S.evRun = null; } }
   if (S.loc !== to) { S.loc = to; S.visited[to] = (S.visited[to] || 0) + 1; }
   S.encLeft = {};
-  if (!shut) log("note", isRanger() ? `Your Pokémon were all knocked out. You went to ${to === "Ranger Headquarters" ? "Ranger Headquarters" : "the Pokémon Center in " + to} to heal up and recharge the Styler.` : `Your party was wiped out. You rushed back to the Pokémon Center in ${to}, and your Pokémon were healed.`);
+  if (!shut) log("note", isRanger() ? `${allOut ? "Your Pokémon were all knocked out. " : ""}You went to ${to === "Ranger Headquarters" ? "Ranger Headquarters" : "the Pokémon Center in " + to} to heal up and recharge the Styler.` : `Your party was wiped out. You rushed back to the Pokémon Center in ${to}, and your Pokémon were healed.`);
   if (shut && S.mafiaMsg) { toast(S.mafiaMsg); delete S.mafiaMsg; } else toast(to === "Ranger Headquarters" ? "Back to Ranger Headquarters" : `Back to the Pokémon Center in ${to}`);
 }
 
@@ -7153,9 +7154,10 @@ function rangerOK(m, ms, loc) {
   if (!isRanger() || m.partner) return true;
   if (!m.temp) return false;
   const R = rgr();
-  if (ms) { const ch = chainOf(ms.t); return m.mtag === ch || m.capFor === ch; }
-  if (m.capLoc === loc && m.capVisit === (S.visited[loc] || 0)) return true;
-  const L = LOCMAP.get(loc); return !!(L && S.party.includes(m.id) && (m.capLoc === loc || (L.cn || []).includes(m.capLoc)));
+  const free = !m.mtag && !m.capFor && !m.sbUse;
+  if (ms) { const ch = chainOf(ms.t); return free || m.mtag === ch || m.capFor === ch; }
+  if (free) return true;
+  const ev = S.evRun && LOCMAP.get(S.evRun.loc); return !!(ev && m.sbUse === "ev:" + eventKey(ev.n, ev.ev[S.evRun.i])); // a helper stays for the rest of the event it joined
 }
 function rgTag(m) {
   const R = rgr();
@@ -7276,7 +7278,7 @@ function finishMission(t, res) {
 }
 // standby Pokémon go back to the wild when a mission ends (Poké Assist helpers already left)
 function releaseMission(ch, why) {
-  const st = standbyMons().filter((m) => m.mtag === ch || m.capFor === ch || (!m.capFor && !m.mtag));
+  const st = standbyMons().filter((m) => m.mtag === ch || m.capFor === ch);
   if (!st.length) return;
   const ids = new Set(st.map((m) => m.id));
   S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => !ids.has(id));
@@ -7321,7 +7323,19 @@ function rgEventFail(L, t, why) {
   S.events[k] = "failed"; delete (S.rgBoss || {})[L.n + "|" + t.n + "|" + t.at];
   log("fail", `Failed ${e.t}: ${why}.`);
 }
+function rgHelperUse(B) {
+  const ids = new Set((B.sides.me.mons || []).map((f) => f.monId).filter(Boolean)), gone = [];
+  const evk = S.evRun ? (() => { const L = LOCMAP.get(S.evRun.loc); return L ? "ev:" + eventKey(L.n, L.ev[S.evRun.i]) : null; })() : null;
+  standbyMons().forEach((m) => {
+    if (!ids.has(m.id) || m.mtag) return;
+    if (B.ms) { if (!m.capFor) m.capFor = chainOf(B.ms.t); return; }
+    if (evk) { m.sbUse = evk; return; }
+    if (!m.capFor) gone.push(m);
+  });
+  if (gone.length) { const g = new Set(gone.map((m) => m.id)); S.mons = S.mons.filter((m) => !g.has(m.id)); S.party = S.party.filter((id) => !g.has(id)); log("note", `${gone.map(monName).join(", ")} helped out, then returned to the wild.`); }
+}
 function rgBattleDone(B, res) {
+  try { if (isRanger()) rgHelperUse(B); } catch (e) {}
   if (res === "loss" && !B.ms && !B.myth && B.trIdx != null && !S.evRun) { const L = LOCMAP.get(B.loc), t = L && L.tr[B.trIdx]; if (t && rgBossRow(L, t)) rgEventFail(L, t, "your Pokémon lost the battle"); }
   if (B.ms && res === "loss") {
     const ch = chainOf(B.ms.t), steps = flatSteps(B.ms.t), P = MP(B.ms.t);
@@ -7414,7 +7428,7 @@ function rangerWatch() {
     R.evSeen = keys.slice();
     // wild Pokémon stay through a multi-part event; otherwise they go back to the wild
     const pending = fresh.some((k) => { const [loc, title] = k.split("|"), L = LOCMAP.get(loc), m = title.match(/^(.*) Part (\d+)$/); return m && L && L.ev.some((e) => e.t === `${m[1]} Part ${+m[2] + 1}` && !S.events[eventKey(L.n, e)]); });
-    if (!pending) { const act = R.active ? chainOf(R.active) : null; const near = (m) => fresh.some((k) => { const lo = k.split("|")[0], LL = LOCMAP.get(lo); return m.capLoc === lo || !!(LL && (LL.cn || []).includes(m.capLoc)); }); const st = standbyMons().filter((m) => !standbyKeep(m) && near(m)); if (st.length) { const ids = new Set(st.map((m) => m.id)); S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => !ids.has(id)); log("note", `${st.map(monName).join(", ")} returned to the wild (event over).`); } }
+    if (!pending) { const st = standbyMons().filter((m) => m.sbUse && fresh.includes(m.sbUse.slice(3))); if (st.length) { const ids = new Set(st.map((m) => m.id)); S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => !ids.has(id)); log("note", `${st.map(monName).join(", ")} returned to the wild (event over).`); } }
     save();
   }
 }
@@ -10387,7 +10401,10 @@ function hikersAfter(B, res) {
   return () => hikersRoll(L, e, k);
 }
 function hikersRoll(L, e, k) {
-  const fid = (S.flags || {}).hikersGolem, m = (typeof fid === "string" && S.mons.find((x) => x.id === fid)) || leadMon(), bonus = m && monStats(m).types.some((t) => t === "FLYING" || t === "GROUND") ? 2 : 0;
+  const fly = (x) => x && monStats(x).types.some((t) => t === "FLYING" || t === "GROUND");
+  const fid = (S.flags || {}).hikersGolem; let m = (typeof fid === "string" && S.mons.find((x) => x.id === fid)) || leadMon();
+  if (isRanger() && !fly(m)) m = fitMons().find((x) => (x.partner || x.temp) && fly(x)) || m; // a Ranger's Partner or a Standby helper can carry the hikers
+  const bonus = fly(m) ? 2 : 0;
   const r = rnd(20), tot = r + bonus, ok = tot >= 10;
   delete S.flags.hikersGolem;
   const html = `<div>The trail is clear. Now get the hikers down safely.</div>${d20Box([r], `${r}${bonus ? ` + 2 (${esc(monName(m))} is Flying or Ground)` : ""} = <b>${tot}</b> · need 10`)}<div class="result ${ok ? "hit" : "miss"}">${ok ? "Everyone made it down safely!" : "Rescuers had to take over."}</div>`;
@@ -10600,6 +10617,23 @@ setInterval(() => {
   } catch (e) { return; }
   if (was.length) { log("note", was.join(". ") + "."); toast(was[0]); save(); }
 }, 1500);
+// event text for Rangers: Rangers earn Ranks, not Badges, and get no Badge offers
+function rgDesc(d) {
+  if (!d || typeof isRanger !== "function" || !isRanger()) return d;
+  return String(d)
+    .replace(/[^.]*\boffers? you the [\w’'-]+ Badge[^.]*\.\s*/g, "")
+    .replace(/,? and offer you the [\w’'-]+ Badge/g, "")
+    .replace(/ to earn the [\w’'-]+ Badge(?: from [\w’'-]+)?/g, " to pass")
+    .replace(/\(earn 1 Badge to unlock/g, "(earn your next Ranger Rank to unlock")
+    .replace(/until you earn your next Badge/g, "until your next Ranger Rank")
+    .replace(/earn 2 more Badges(?:, Ribbons or Frontier Symbols)?/g, "earn 2 more Ranger Ranks")
+    .replace(/once per Badge/gi, "once per Ranger Rank")
+    .replace(/for your Badge count or any earlier one/g, "for your Ranger Rank or any earlier one")
+    .replace(/A new shipment of parts arrives once you earn your next Badge\./g, "A new shipment of parts arrives at your next Ranger Rank.")
+    .replace(/no matter how many Badges you have/g, "no matter what your Ranger Rank is")
+    .replace(/Defeat the wild Golem on the trail/g, "Calm the wild Golem on the trail with your Styler")
+    .replace(/if your Golem-beater is Flying or Ground/g, "if your Partner or a Standby helper is Flying or Ground");
+}
 
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
