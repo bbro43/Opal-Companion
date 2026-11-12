@@ -6087,6 +6087,8 @@ function evoCheck(m, to) {
   const it = ITEMS.find((i) => i.name.length > 3 && new RegExp("\\b" + i.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i").test(how));
   // the item can be in the Bag or held by the Pokémon
   if (it && !/Friendship/i.test(how)) { const held = m.item === it.name, ok = held || hasItem(it.name); return { ok, item: it.name, held, why: ok ? "" : `Needs a ${it.name} (in your Bag or held).` }; }
+  // "Visit 10 different locations while in Party" (Gimmighoul): counted as you travel with it
+  { const v = /Visit (\d+) different locations/i.exec(how); if (v) { const n = (m.visits || []).length, ok = n >= +v[1]; return { ok, why: ok ? "" : `Needs to visit ${v[1]} different places while in your party (${n} so far).` }; } }
   // Pokémon that evolve by trade in the main series can use a Linking Cord instead of Friendship 10
   if (TRADE_EVO.includes(to) && m.fr < 10 && hasItem("Linking Cord")) return { ok: true, item: "Linking Cord", why: "" };
   if (TRADE_EVO.includes(to) && m.fr < 10 && m.item === "Linking Cord") return { ok: true, item: "Linking Cord", held: true, why: "" };
@@ -10706,6 +10708,21 @@ function rgDesc(d) {
 
 // Ranger saves: event Eggs left at HQ come back to the party to hatch
 setInterval(() => { if (typeof S === "undefined" || !S || !Array.isArray(S.mons) || typeof isRanger !== "function" || !isRanger()) return; S.mons.forEach((m) => { if (m.egg && m.hq) { m.hq = false; if (S.party.length < 6 && !S.party.includes(m.id)) S.party.push(m.id); log("note", "An Egg you got from an event joined your party so it can hatch."); save(); } }); }, 2000);
+
+// Rangers: each new Ranger Rank gives the Partner +1 Friendship (old saves catch up once)
+// and Pokémon in the party remember the places they've visited (Gimmighoul → Gholdengo)
+setInterval(() => {
+  if (typeof S === "undefined" || !S || !Array.isArray(S.mons) || (typeof titleUp === "function" && titleUp())) return;
+  let ch = false;
+  { const pm = typeof partnerMon === "function" && isRanger() && partnerMon(); if (pm && !pm.visits && S.visited) { pm.visits = Object.keys(S.visited); ch = true; } } // a Partner has been everywhere you have
+  if (S.loc && S.loc !== S._visitLoc) { S._visitLoc = S.loc; partyMons().forEach((m) => { if (m.egg) return; m.visits = m.visits || []; if (!m.visits.includes(S.loc)) { m.visits.push(S.loc); ch = true; } }); }
+  if (typeof isRanger === "function" && isRanger()) {
+    const r = rangerRank(), p = partnerMon();
+    if (S.rgFrRank == null) S.rgFrRank = 1;
+    if (r > S.rgFrRank) { const d = r - S.rgFrRank; S.rgFrRank = r; if (p && (p.fr || 0) < 10) { const was = p.fr || 0; p.fr = Math.min(10, was + d); log("note", `${monName(p)}'s Friendship rose to ${p.fr} (Ranger Rank ${r}).`); } ch = true; }
+  }
+  if (ch) save();
+}, 1200);
 
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
