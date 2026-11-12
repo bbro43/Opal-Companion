@@ -6509,8 +6509,24 @@ function vHqBox(L) {
   if (!isRanger() || L.n !== "Ranger Headquarters") return "";
   const ms = hqMons(), p = partnerMon();
   return `<section class="card"><div class="card-h"><h2>Headquarters Box</h2><span class="sub">${ms.length} Pokémon</span></div>
-    ${ms.length ? `<div class="list">${ms.map((m) => `<div class="li"><div class="main"><div class="t">${sprite(m.sp, "xs", m.shiny)} ${esc(monName(m))}</div><div class="d">${esc(m.sp)} · BST ${monBST(m)} · Friendship ${m.fr}</div></div><button class="btn sm" data-act="hq-partner" data-id="${m.id}">Make Partner</button></div>`).join("")}</div>` : `<div class="empty">Reward Pokémon that join you wait here.</div>`}
+    ${ms.length ? `<div class="list">${ms.map((m) => `<div class="li"><div class="main"><div class="t">${sprite(m.sp, "xs", m.shiny)} ${esc(monName(m))}</div><div class="d">${esc(m.sp)} · BST ${monBST(m)} · Friendship ${m.fr}</div></div><button class="btn sm" data-act="hq-partner" data-id="${m.id}">Make Partner</button><button class="btn sm ghost" data-act="hq-standby" data-id="${m.id}" ${standbyFree().length >= styler().standby ? "disabled" : ""}>Take on Standby</button></div>`).join("")}</div>` : `<div class="empty">Reward Pokémon that join you wait here.</div>`}
     <div class="tiny muted">Your Partner${p ? ` (${esc(monName(p))})` : ""} is the one Pokémon that always battles with you. Swapping sends the old Partner to this Box.</div></section>`;
+}
+function hqStandby(id, sure) {
+  if (!isRanger() || S.loc !== "Ranger Headquarters") { toast("Take Pokémon from the Box at Ranger Headquarters."); return; }
+  const m = S.mons.find((x) => x.id === id); if (!m || m.partner) return;
+  if (S.battle || S.capture || S.evRun) { toast("Finish what you're doing first."); return; }
+  if (standbyFree().length >= styler().standby) { toast(`Your Standby is full (${styler().standby}).`); return; }
+  if (!sure) {
+    modal("Ranger Leader", `<div class="row" style="gap:10px;align-items:flex-start">${sprite(m.sp, "sm", m.shiny)}<div>“Are you sure you want to take ${esc(monName(m))} with you? A Ranger should always try to keep their Standby open, so they can adapt to the job at hand.”</div></div>
+      <div class="row"><button class="btn primary" data-y>Yes, take it</button><button class="btn ghost" data-n>No</button></div>`,
+      (el) => { $("[data-y]", el).addEventListener("click", () => { closeModal(); hqStandby(id, true); }); $("[data-n]", el).addEventListener("click", closeModal); });
+    return;
+  }
+  delete m.hq; m.temp = true; m.fromHQ = true; m.capLoc = S.loc; if (!S.party.includes(m.id)) S.party.push(m.id);
+  S.hqOut = S.hqOut || {}; S.hqOut[m.id] = JSON.parse(JSON.stringify(m));
+  log("note", `${monName(m)} left Ranger Headquarters on Standby. It comes back to the Box once it's been used.`);
+  commit(`${monName(m)} is on Standby`);
 }
 function hqPartner(id) {
   if (!isRanger() || S.loc !== "Ranger Headquarters") { toast("Swap Partners at Ranger Headquarters."); return; }
@@ -6902,7 +6918,7 @@ function evButtons(L, x) {
 
 /* ---------- Rangers don't do Trainer battles, Gyms, contests, the Conference or the Festival ---------- */
 function rangerOff(L, e, comp) {
-  return !!comp || /Contest|Grand Festival|Conference|Champions League|^Trainer Tower$|^The Hitmon Challenge$|Day Care$|Tutorial$|^Rival Battle|^Trade: |^The Pidgey Hunt$/.test(e.t) || (!!L && typeof eventTrainers === "function" && eventTrainers(L, e).some(([t]) => /^Rival/.test(t.n)));
+  return !!comp || /Contest|Grand Festival|Conference|Champions League|^Trainer Tower$|^The Hitmon Challenge$|Day Care$|Tutorial$|^Rival Battle|^Trade: |^The Pidgey Hunt$|^The Austra Open|^Interviewing a Champ$/.test(e.t) || (!!L && typeof eventTrainers === "function" && eventTrainers(L, e).some(([t]) => /^Rival/.test(t.n)));
 }
 const rangerNoFight = (t, L) => (!!L && !/Mafia|Grunt|Admin|Boss/i.test(t.n) && typeof eventOfTrainer === "function" && !eventOfTrainer(L, t)) || /^(Gym Leader|Frontier Brain|Coordinator|Rival|Elite Four|Champion)/.test(t.n) || (!!t.rw && !/Mafia/i.test(t.n));
 
@@ -7421,6 +7437,7 @@ function rangerEventCounts(key) {
   const e = L.ev.find((x) => x.t === title); if (!e) return false;
   if (/Battle Festival|The Beginning/.test(e.t) || rangerOff(L, e, compOf(L, e))) return false;
   if (/Day Care|PokéRinger|Baccer|Growlithe Race|Fishing Challenge|Safari Game/i.test(e.t)) return false;
+  if (typeof GIFT_EVENTS !== "undefined" && GIFT_EVENTS[e.t]) return false; // a gift Pokémon isn't a Ranger's job
   // later parts of a multi-part event count when Part 1 does
   { const m = e.t.match(/^(.*) Part ([2-9])$/); if (m) { const p1 = L.ev.find((x) => x.t === m[1] + " Part 1"); if (p1) return rangerEventCounts(L.n + "|" + p1.t); } }
   if (MYTH_SP[e.t] || EVENT_CATCH[e.t] || /^(Safari Poachers|The Copper Poachers|The Injured Nidoran|Cave In|The Test Fire)$/.test(e.t)) return true;
@@ -10751,6 +10768,21 @@ setInterval(() => {
   partyMons().forEach((m) => { if (m.egg || m.evoNote === m.sp) return; const to = evolutionsOf(m.sp).find((x) => { try { return evoCheck(m, x.name).ok && !/Stone|Item|Hold|Trade|Use /i.test(x.evoMethod || ""); } catch (e) { return false; } }); if (to) { m.evoNote = m.sp; log("note", `${monName(m)} can evolve into ${to.name}! Open its Details to evolve it.`); toast(`${monName(m)} can evolve!`); save(); } });
 }, 2500);
 
+setInterval(() => {
+  if (typeof S === "undefined" || !S || !S.hqOut || !Array.isArray(S.mons)) return;
+  let ch = false;
+  Object.keys(S.hqOut).forEach((id) => {
+    const cur = S.mons.find((x) => x.id === id);
+    if (cur && cur.temp) return; // still on Standby
+    const m = cur || S.hqOut[id]; delete S.hqOut[id]; ch = true;
+    delete m.temp; delete m.fromHQ; delete m.sbUse; delete m.capFor; delete m.mtag; delete m.pickAt; m.hp = null; m.status = ""; m.hq = true;
+    if (!cur) S.mons.push(m);
+    S.party = S.party.filter((x) => x !== id);
+    log("note", `${monName(m)} went back to the Ranger Headquarters Box.`);
+  });
+  if (ch) { save(); if (typeof render === "function") render(); }
+}, 1500);
+
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
    ============================================================ */
@@ -11394,6 +11426,7 @@ document.addEventListener("click", (e) => {
     case "link-give": openGiftGive(el.dataset.pid); break;
     case "ct-linked": startLinkedContest(el.dataset.a, el.dataset.b); break;
     case "hq-partner": hqPartner(el.dataset.id); break;
+    case "hq-standby": hqStandby(el.dataset.id); break;
     case "ev-gift": evGift(el.dataset.loc, +el.dataset.i); break;
     case "dc-goto": if (S.loc !== el.dataset.loc) { toast(`Travel to ${el.dataset.loc} to use its Day Care.`); break; } S.tab = "map"; render(); setTimeout(() => { const c = [...document.querySelectorAll(".card h2")].find((h) => h.textContent === "Pokémon Day Care"); if (c) c.scrollIntoView({ block: "start" }); }, 50); break;
     case "ferry": { const p = +el.dataset.p; if (S.money < p) { toast(`The ferry costs ${money(p)}.`); break; } S.money -= p; log("event", `Paid ${money(p)} for the ferry.`); travel(el.dataset.to, "Took the ferry to"); break; }
