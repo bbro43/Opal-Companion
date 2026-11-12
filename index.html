@@ -2490,6 +2490,7 @@ function gymRows(L, t) {
   return t.m.slice(start, start + n);
 }
 function trRow(L, t, i) {
+  const evFailed = (() => { const e0 = typeof eventOfTrainer === "function" && eventOfTrainer(L, t); return !!(e0 && S.events[eventKey(L.n, e0)] === "failed" && !REPEATABLE.test(e0.t) && S.settings.view !== "gm"); })();
   const k = L.n + "|" + t.n + "|" + t.at, beat = S.beaten[k];
   let mons = t.m;
   let note = "";
@@ -2501,7 +2502,7 @@ function trRow(L, t, i) {
   return `<div class="li ${av.ok ? "" : "dim"}">${trainerSprite(t.n, "row")}<div class="main"><div class="t">${esc(t.n)} ${size ? `<span class="pill">${size}v${size}</span>` : ""}${beat ? `<span class="pill good">Beaten</span>` : ""}${!av.ok && av.why !== "Beaten" ? `<span class="pill ${av.later ? "" : "warn"}">${esc(av.why)}</span>` : ""}</div>
     <div class="d">${/^\d+$/.test(t.at) ? "Contest Participant #" + esc(t.at) : esc(t.at)}${t.rw ? " · " + esc(t.rw) : ""} · ${(() => { const ts = trainerStats(L, t); return `Obedience ${ts.obedience}${t.g || t.x ? `, Grooming ${t.g}, Execution ${t.x}` : `, Intuition ${ts.intuition}, Will ${ts.will}`}${ts.intuition !== t.i ? " (5th Badge on: +1)" : ""}`; })()}${note ? " · " + note : ""}</div>
     ${playerView() ? `<div class="d"><i>${mons.length} Pokémon</i></div>` : `<div class="team">${mons.map((m) => sprite(m[0], "sm")).join("")}</div><div class="d">${mons.map((m) => esc(m[0]) + genderIcon(m[9], m[0])).join(", ")}</div>`}${t.nt ? `<div class="d"><i>${esc(t.nt)}</i></div>` : ""}</div>
-    ${isRanger() && rgBossRow(L, t) && !beat ? `<button class="btn sm primary" data-act="rg-boss" data-loc="${esc(L.n)}" data-i="${i}" ${av.ok ? "" : "disabled"}>Capture${t.m.length > 1 ? ` (${rgBossGot(L, t)}/${t.m.length})` : ""}</button>` : ""}${S.settings.view !== "gm" && oneTryEvent(L, t) && oneTryEvent(L, t).t === "The Hitmon Challenge" ? "" : `<button class="btn sm" data-act="battle-trainer" data-loc="${esc(L.n)}" data-i="${i}" ${(L.n === SHIP && !S.cruise) || !av.ok || (isRanger() && (rangerNoFight(t, L) || (tev && rangerOff(L, tev)))) ? "disabled" : ""}>${L.n === SHIP ? ({ "PokéRinger": `Race · ${money(SHIP_FEE.ringer)}`, "Pokémon Baccer": `Play · ${money(SHIP_FEE.baccer)}`, "Double Battles": `Battle · ${money(SHIP_FEE.doubles)}` }[t.at] || "Battle") : "Battle"}</button>`}</div>`;
+    ${isRanger() && rgBossRow(L, t) && !beat ? `<button class="btn sm primary" data-act="rg-boss" data-loc="${esc(L.n)}" data-i="${i}" ${av.ok && !evFailed ? "" : "disabled"}>Capture${t.m.length > 1 ? ` (${rgBossGot(L, t)}/${t.m.length})` : ""}</button>` : ""}${(S.settings.view !== "gm" && oneTryEvent(L, t) && oneTryEvent(L, t).t === "The Hitmon Challenge") || (isRanger() && rgBossRow(L, t)) ? "" : `<button class="btn sm" data-act="battle-trainer" data-loc="${esc(L.n)}" data-i="${i}" ${(L.n === SHIP && !S.cruise) || !av.ok || evFailed || (isRanger() && (rangerNoFight(t, L) || (tev && rangerOff(L, tev)))) ? "disabled" : ""}>${L.n === SHIP ? ({ "PokéRinger": `Race · ${money(SHIP_FEE.ringer)}`, "Pokémon Baccer": `Play · ${money(SHIP_FEE.baccer)}`, "Double Battles": `Battle · ${money(SHIP_FEE.doubles)}` }[t.at] || "Battle") : "Battle"}</button>`}</div>`;
 }
 
 /* ---------------- Journal ---------------- */
@@ -3425,7 +3426,7 @@ function openEncounter() {
   const honey = (S.bag["Honey"] || 0) > 0, snack = (S.bag["Poké Snack"] || 0) > 0;
   // the Fishing Challenge casts are separate from ordinary encounters on Route W08
   const fishing = !!(S.fishing && S.loc === "Route W08" && UI.fishCast); UI.fishCast = false;
-  const limited = !fishing && !(S.safari && S.loc === "Safari Zone") && !hasPC(L);
+  const limited = !fishing && !(S.safari && S.loc === "Safari Zone") && !hasPC(L) && !isRanger(); // a Ranger's searches cost Styler Energy instead
   const evW = limited ? eventWildHere() : [];
   if (limited && encLeft(S.loc) <= 0 && !evW.length) { toast(`No wild encounters left on ${S.loc}. Visit a town with a Pokémon Center to reset them.`); return; }
   modal(fishing ? "Fishing Challenge" : "Look for wild Pokémon", `<div class="small muted">Roll a d20. You can meet any Pokémon here with a Rate at or below your roll.${hasRod() ? " The Fishing Rod lowers Water types' Rate by 5." : ""}${encounterBonus() ? ` Bonuses add +${encounterBonus()}.` : ""}</div>${fieldNote()}
@@ -4506,7 +4507,7 @@ function releaseStandby(why) {
   const st = standbyMons().filter((m) => !standbyKeep(m) && (m.sbUse || m.capFor)); if (!st.length) return; // unused helpers stay with you
   const ids = new Set(st.map((m) => m.id));
   S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => S.mons.some((m) => m.id === id));
-  log("note", `${st.map(monName).join(", ")} returned to the wild${why ? " (" + why + ")" : ""}.`);
+  log("note", `${st.map(monName).join(", ")} ${st.every((m) => m.fromHQ) ? "went back to Ranger Headquarters" : "returned to the wild"}${why ? " (" + why + ")" : ""}.`);
 }
 function openMissionResult(i) {
   const m = MISSIONS[i];
@@ -4641,7 +4642,7 @@ function capAssist(id, ty) {
   ["hp", "atk", "def", "spd"].forEach((k) => (t[k] = Math.max(0, t[k])));
   C.aType = ty; C.aMod = C.mod - mod0; msg += " (for your next throw)";
   if (m.partner) { C.partnerUsed = true; C.log.push(`${monName(m)} Poké Assist (${cap(ty)}): ${msg}. Your Partner stays with you.`); }
-  else { C.log.push(`${monName(m)} Poké Assist (${cap(ty)}): ${msg}. ${monName(m)} returns to the wild.`); S.mons = S.mons.filter((x) => x !== m); S.party = S.party.filter((x) => x !== m.id); }
+  else { C.log.push(`${monName(m)} Poké Assist (${cap(ty)}): ${msg}. ${monName(m)} ${m.fromHQ ? "goes back to Ranger Headquarters" : "returns to the wild"}.`); S.mons = S.mons.filter((x) => x !== m); S.party = S.party.filter((x) => x !== m.id); }
   save(); render();
 }
 function assistClear(C, after) {
@@ -5998,7 +5999,7 @@ function evRunAfter(res, B) {
   }
   if (res === "caught" || (res === "win" && !(cur && cur.c))) {
     R.pos++;
-    if (R.pos < R.list.length) { const st = R.list[R.pos], nm = st && st.c ? `a wild ${st.c} to ${isRanger() ? "capture" : "catch"}` : st && st.f ? `a wild ${st.f}${isRanger() ? " to capture" : ""}` : L.tr[st].n; return () => modal(e.t, `<div>Next up: <b>${esc(nm)}</b>.</div><div class="small muted">${R.pos}/${R.list.length} steps done. Event battles run back to back: no healing and no leaving until they're done.</div><div class="row"><button class="btn primary" data-ern>${st && st.c ? "Look for it" : st && st.f ? (isRanger() ? "Capture the next " : "Fight the next ") + esc(st.f) : "Battle " + esc(nm)}</button><button class="btn ghost" data-erq>Give up the event</button></div>`, (el) => { MODAL.lock = "Pick one first."; $("[data-ern]", el).addEventListener("click", () => { MODAL.lock = null; closeModal(); evRunNext(); }); $("[data-erq]", el).addEventListener("click", () => { MODAL.lock = null; closeModal(); const R0 = S.evRun; if (!R0) return; const L0 = LOCMAP.get(R0.loc), e0 = L0.ev[R0.i]; S.evRun = null; S.events[eventKey(L0.n, e0)] = "failed"; log("fail", `Gave up ${e0.t} at ${L0.n}.`); eventOutcome(L0, e0, "failed"); subwayAfter(false); commit("Event failed"); }); }); }
+    if (R.pos < R.list.length) { const st = R.list[R.pos], nm = st && st.c ? `a wild ${st.c} to ${isRanger() ? "capture" : "catch"}` : st && st.f ? `a wild ${st.f}${isRanger() ? " to capture" : ""}` : L.tr[st].n; return () => modal(e.t, `<div>Next up: <b>${esc(nm)}</b>.</div><div class="small muted">${R.pos}/${R.list.length} steps done. Event battles run back to back: no healing and no leaving until they're done.</div><div class="row"><button class="btn primary" data-ern>${st && st.c ? "Look for it" : st && st.f ? (isRanger() ? "Capture the next " : "Fight the next ") + esc(st.f) : (isRanger() && L.tr[st] && rgBossRow(L, L.tr[st]) ? "Capture " : "Battle ") + esc(nm)}</button><button class="btn ghost" data-erq>Give up the event</button></div>`, (el) => { MODAL.lock = "Pick one first."; $("[data-ern]", el).addEventListener("click", () => { MODAL.lock = null; closeModal(); evRunNext(); }); $("[data-erq]", el).addEventListener("click", () => { MODAL.lock = null; closeModal(); const R0 = S.evRun; if (!R0) return; const L0 = LOCMAP.get(R0.loc), e0 = L0.ev[R0.i]; S.evRun = null; S.events[eventKey(L0.n, e0)] = "failed"; log("fail", `Gave up ${e0.t} at ${L0.n}.`); eventOutcome(L0, e0, "failed"); subwayAfter(false); commit("Event failed"); }); }); }
     const tw = R.tower ? R : null;
     S.evRun = null; S.events[k] = "passed"; eggCrack(1); log("event", `Passed ${e.t} at ${L.n}.`); eventOutcome(L, e, "passed");
     const nx = subwayAfter(true);
@@ -7314,7 +7315,7 @@ function releaseMission(ch, why) {
   if (!st.length) return;
   const ids = new Set(st.map((m) => m.id));
   S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => !ids.has(id));
-  log("note", `${st.map(monName).join(", ")} returned to the wild (${why}).`);
+  log("note", `${st.map(monName).join(", ")} ${st.every((m) => m.fromHQ) ? "went back to Ranger Headquarters" : "returned to the wild"} (${why}).`);
 }
 
 /* ---------- capture results ---------- */
@@ -7366,7 +7367,7 @@ function rgHelperUse(B) {
     if (evk) { m.sbUse = evk; return; }
     if (!m.capFor) gone.push(m);
   });
-  if (gone.length) { const g = new Set(gone.map((m) => m.id)); S.mons = S.mons.filter((m) => !g.has(m.id)); S.party = S.party.filter((id) => !g.has(id)); log("note", `${gone.map(monName).join(", ")} helped out, then returned to the wild.`); }
+  if (gone.length) { const g = new Set(gone.map((m) => m.id)); S.mons = S.mons.filter((m) => !g.has(m.id)); S.party = S.party.filter((id) => !g.has(id)); log("note", `${gone.map(monName).join(", ")} helped out, then ${gone.every((m) => m.fromHQ) ? "went back to Ranger Headquarters" : "returned to the wild"}.`); }
 }
 function rgBattleDone(B, res) {
   try { if (isRanger()) rgHelperUse(B); } catch (e) {}
@@ -7464,7 +7465,7 @@ function rangerWatch() {
     R.evSeen = keys.slice();
     // wild Pokémon stay through a multi-part event; otherwise they go back to the wild
     const pending = fresh.some((k) => { const [loc, title] = k.split("|"), L = LOCMAP.get(loc), m = title.match(/^(.*) Part (\d+)$/); return m && L && L.ev.some((e) => e.t === `${m[1]} Part ${+m[2] + 1}` && !S.events[eventKey(L.n, e)]); });
-    if (!pending) { const chK = (k) => String(k || "").replace(/ Part \d+(?=\|)/, "").replace(/\|[^|]*$/, ""); const st = standbyMons().filter((m) => (m.sbUse && fresh.some((f) => chK(f) === chK(m.sbUse.slice(3)))) || (m.pickAt && Date.now() - m.pickAt < 900000)); if (st.length) { const ids = new Set(st.map((m) => m.id)); S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => !ids.has(id)); log("note", `${st.map(monName).join(", ")} returned to the wild (event over).`); } }
+    if (!pending) { const chK = (k) => String(k || "").replace(/ Part \d+(?=\|)/, "").replace(/\|[^|]*$/, ""); const st = standbyMons().filter((m) => (m.sbUse && fresh.some((f) => chK(f) === chK(m.sbUse.slice(3)))) || (m.pickAt && Date.now() - m.pickAt < 900000)); if (st.length) { const ids = new Set(st.map((m) => m.id)); S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => !ids.has(id)); log("note", `${st.map(monName).join(", ")} ${st.every((m) => m.fromHQ) ? "went back to Ranger Headquarters" : "returned to the wild"} (event over).`); } }
     save();
   }
 }
@@ -10778,7 +10779,7 @@ setInterval(() => {
     delete m.temp; delete m.fromHQ; delete m.sbUse; delete m.capFor; delete m.mtag; delete m.pickAt; m.hp = null; m.status = ""; m.hq = true;
     if (!cur) S.mons.push(m);
     S.party = S.party.filter((x) => x !== id);
-    log("note", `${monName(m)} went back to the Ranger Headquarters Box.`);
+    if (!cur) {} else log("note", `${monName(m)} went back to the Ranger Headquarters Box.`);
   });
   if (ch) { save(); if (typeof render === "function") render(); }
 }, 1500);
