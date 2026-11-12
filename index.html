@@ -7704,11 +7704,11 @@ function openStylerGame() {
   // the Pokémon
   const speedNow = () => 45 + Math.max(0, C.t.spd) * 13; let speed = speedNow();
   const R0 = Math.max(18, Math.min(30, Math.min(W, H) * 0.06));
-  const P = { x: W / 2, y: H / 2, vx: 0, vy: 0, turn: 0 };
-  const steer = () => { speed = speedNow(); const a = Math.random() * Math.PI * 2; P.vx = Math.cos(a) * speed; P.vy = Math.sin(a) * speed; P.turn = 0.8 + Math.random() * 1.8; };
+  const P = { x: W / 2, y: H / 2, vx: 0, vy: 0, turn: 0 }; ov._P = P;
+  const steer = () => { speed = speedNow(); const mx = W * 0.22, my = H * 0.22, tx = mx + Math.random() * (W - 2 * mx), ty = my + Math.random() * (H - 2 * my), a = Math.atan2(ty - P.y, tx - P.x) + (Math.random() - 0.5) * 0.6; P.vx = Math.cos(a) * speed; P.vy = Math.sin(a) * speed; P.turn = 0.8 + Math.random() * 1.6; };
   steer();
   // the line
-  const maxLen = Math.min(W, H) * (2.6 + 0.12 * rank) + 25 * rStat("power");
+  const maxLen = Math.min(W, H) * (3.6 + 0.15 * rank) + 30 * rStat("power");
   let paused = false;
   let pts = [], down = false, finger = null, loops = 0, flash = null, hurt = 0, over = false, left = secs, last = performance.now();
   const len = () => { let s = 0; for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return s; };
@@ -7725,15 +7725,21 @@ function openStylerGame() {
     pts.push(p); trim();
     const n = pts.length; if (n < 4) return;
     const a = pts[n - 2], b = pts[n - 1];
+    const counted = (poly) => { loops++; flash = { poly, t: 0.45 }; pts = [b]; hud(); if (navigator.vibrate) navigator.vibrate(25); if (loops >= need) { end(true); return true; } msg(`Loop ${loops}! ${need - loops} more.`); return true; };
+    const around = (poly) => poly.length > 3 && (inside(poly, P) || poly.some((q, k) => k && segDist(P, poly[k - 1], q) < R0 * 0.5));
     for (let i = 0; i < n - 4; i++) {
       const X = hit(pts[i], pts[i + 1], a, b); if (!X) continue;
       const poly = [X].concat(pts.slice(i + 1, n - 1));
-      if (poly.length > 3 && inside(poly, P)) {
-        loops++; flash = { poly, t: 0.45 }; pts = [b]; hud();
-        if (loops >= need) return end(true);
-        msg(`Loop ${loops}! ${need - loops} more.`);
-      } else pts = pts.slice(i + 1);
-      return;
+      if (around(poly)) return counted(poly);
+      pts = pts.slice(i + 1); return;
+    }
+    // forgiving close: the finger comes back near an earlier point after going round
+    const closeR = 34 + 3 * rank, minRun = Math.PI * R0 * 2.2;
+    let run = 0;
+    for (let i = n - 2; i >= 0; i--) {
+      run += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+      if (run < minRun) continue;
+      if (Math.hypot(pts[i].x - b.x, pts[i].y - b.y) < closeR) { const poly = pts.slice(i); if (around(poly)) return counted(poly); }
     }
   };
   const pos = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
@@ -7789,6 +7795,7 @@ function openStylerGame() {
       // glide and bounce
       P.turn -= dt; if (P.turn <= 0) steer();
       P.x += P.vx * dt; P.y += P.vy * dt;
+      { const E = Math.min(W, H) * 0.12; if ((P.x < E && P.vx < 0) || (P.x > W - E && P.vx > 0) || (P.y < E && P.vy < 0) || (P.y > H - E && P.vy > 0)) steer(); } // turn back before the edge
       if (P.x < R0) { P.x = R0; P.vx = Math.abs(P.vx); } if (P.x > W - R0) { P.x = W - R0; P.vx = -Math.abs(P.vx); }
       if (P.y < R0) { P.y = R0; P.vy = Math.abs(P.vy); } if (P.y > H - R0) { P.y = H - R0; P.vy = -Math.abs(P.vy); }
       hurt = Math.max(0, hurt - dt);
