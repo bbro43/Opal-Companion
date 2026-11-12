@@ -946,6 +946,8 @@ function awardList() {
 }
 function statValue(k) { let n = 0; for (const a of awardList()) n += (a.alloc || []).filter((s) => s === k).length; return n; }
 function statsAll() { const o = {}; STATS.forEach((s) => (o[s.k] = statValue(s.k))); return o; }
+// stat points for battle money: a Ranger counts their Ranger stat points
+function battlePoints() { return typeof isRanger === "function" && isRanger() && typeof rSpent === "function" ? rSpent() : pointsSpent(); }
 function pointsSpent() { return awardList().reduce((n, a) => n + (a.alloc || []).length, 0); }
 function pointsPending() {
   // points each award may still hand out, respecting the 20-point total cap (earliest awards first)
@@ -2460,7 +2462,7 @@ function vEvents() {
       ${away ? `<div class="reminder">You're in ${esc(S.loc)}. Travel to ${esc(L.n)} to take part. ${canTravel(L.n) ? `<button class="btn sm" data-act="travel" data-to="${esc(L.n)}">Go to ${esc(L.n)}</button>` : `<button class="btn sm" data-act="map-open">Check map</button>`}</div>` : ""}
       ${e.t === "The Battle " + e.t.split(" ").pop() && FRONTIER_RULES[e.t] ? `<div class="reminder"><b>Battle rules:</b> ${esc(FRONTIER_RULES[e.t].note)} 6v6.${frontierOK() ? "" : " You need 8 Badges and to have competed in the Endigio League Conference, or to have competed in the Grand Festival, first."}</div>` : ""}
       <p class="ev-text">${playerView() && x.st === "later" ? "<i>Your GM will describe this event.</i>" : esc(rgDesc(e.d))}</p>
-      <div class="row">${evButtons(L, x)}${!x.comp && !x.label && x.st === "now" && !away && toFight && !(L.n === "Endigio Town") && L.n !== "S.S. Margot" && e.t !== "The Hitmon Challenge" && (!OWN_STEPS.test(e.t) || (S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i)) ? `<button class="btn sm" data-act="ev-run" data-loc="${esc(L.n)}" data-i="${x.i}">${S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i ? `Resume the event battles (${S.evRun.list.length - S.evRun.pos} left)` : `Start the event battles (${toFight})`}</button>${S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i ? `<button class="btn sm ghost danger" data-act="ev-giveup">Give up the event</button>` : ""}` : ""}${contest ? `<button class="btn sm" data-act="contest-setup" data-type="${contest[1]}">Enter the ${contest[1]} Contest</button>${hall ? (hallWon ? `<span class="pill good">${esc(S.awards[hall.id].type)} Ribbon won here</span>` : "") : ""}` : ""}</div>
+      <div class="row">${evButtons(L, x)}${!x.comp && !x.label && x.st === "now" && !away && toFight && !(L.n === "Endigio Town") && L.n !== "S.S. Margot" && e.t !== "The Hitmon Challenge" && (!OWN_STEPS.test(e.t) || (S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i)) ? `<button class="btn sm" data-act="ev-run" data-loc="${esc(L.n)}" data-i="${x.i}">${S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i ? `Resume the event battles (${S.evRun.list.length - S.evRun.pos} left)` : (isRanger() && fights.every(([t]) => rgBossRow(L, t)) ? `Start the event (${toFight} to capture)` : `Start the event battles (${toFight})`)}</button>${S.evRun && S.evRun.loc === L.n && S.evRun.i === x.i ? `<button class="btn sm ghost danger" data-act="ev-giveup">Give up the event</button>` : ""}` : ""}${contest ? `<button class="btn sm" data-act="contest-setup" data-type="${contest[1]}">Enter the ${contest[1]} Contest</button>${hall ? (hallWon ? `<span class="pill good">${esc(S.awards[hall.id].type)} Ribbon won here</span>` : "") : ""}` : ""}</div>
     </section>
     ${labOf(L, e) ? vResearch(labOf(L, e)) : ""}${vTournament(L, e)}
     ${fights.length && !(L.n === "Endigio Town" && /Conference|Champions League/.test(e.t)) ? `<section class="card"><div class="card-h"><h2>Trainers &amp; bosses in this event</h2><span class="sub">${fights.filter(([t]) => S.beaten[L.n + "|" + t.n + "|" + t.at]).length}/${fights.length} beaten</span></div><div class="list">${fights.map(([t, i]) => trRow(L, t, i)).join("")}</div></section>` : ""}`;
@@ -2812,7 +2814,7 @@ function battleOverCard(B, guess) {
   const res = B.over || guess;
   const used = B.sides.me.mons.filter((f) => f.acted || f.fainted || f.entered || B.sides.me.active.includes(B.sides.me.mons.indexOf(f)));
   const frDefault = B.kind !== "pvp" && !B.evCatch && (res === "win" || res === "caught");
-  const payout = Math.max(100, pointsSpent() * 100);
+  const payout = Math.max(100, battlePoints() * 100);
   const label = { win: "You won", loss: "You lost", caught: "Caught it", fled: "It got away", ran: "You ran", end: "Battle ended", draw: "It's a draw" }[res] || "Battle over";
   return `<section class="card"><div class="card-h"><h2>${label}</h2></div>
     ${res === "win" && B.reward ? `<div>Prize: <b>${esc(B.reward)}</b></div>` : ""}
@@ -3390,6 +3392,7 @@ const SUBWAY_FARE = 500;
 function travel(to, how) {
   if (S.evRun) { toast("Finish the event's battles before you leave."); return; }
   if (S.capture && S.settings.view !== "gm") { toast("Finish the capture (or let it go) before you leave."); return; }
+  if (isRanger() && S.settings.view !== "gm" && rgBossBusy()) { toast("Finish calming the rest of the event's Pokémon before you leave."); return; }
   if (!LOCMAP.has(to)) return;
   if (typeof roadShut === "function" && roadShut(S.loc, to)) { toast(`The Mafia has closed the road between ${S.loc} and ${to}. It reopens after your next ${isRanger() ? "Ranger Rank" : "Badge"}.`); return; }
   // a wild Pokémon you walked away from is gone
@@ -5773,7 +5776,7 @@ function sendToCenter() {
   const to = isRanger() ? (typeof nearestCenter === "function" && nearestCenter(S.loc)) || "Ranger Headquarters" : S.lastPC && LOCMAP.get(S.lastPC) ? S.lastPC : "Endigio Town";
   const allOut = partyMons().every((m) => m.egg || m.hp === 0);
   const shut = to !== "Ranger Headquarters" && typeof centersShut === "function" && centersShut();
-  if (shut) { const hurt = partyMons().filter((m) => !m.egg && ((m.hp != null && m.hp < monStats(m).hp) || m.status)), n = Math.min(hurt.length, Math.floor((S.money || 0) / 500)); hurt.slice(0, n).forEach((m) => { m.hp = null; m.status = ""; }); S.money -= n * 500; const free = !n && hurt.length; if (free) { hurt[0].hp = null; hurt[0].status = ""; } S.mafiaMsg = free ? `Mafia Center: couldn't pay, so only ${monName(hurt[0])} was healed.` : `Mafia Center: ${n} of ${hurt.length} healed for ${money(n * 500)}.`; log("note", free ? `The Pokémon Centers are shut, so you went to a Mafia Center. You couldn't pay, so the grunt healed just your ${monName(hurt[0])} and sent you away.` : `The Pokémon Centers are shut, so you went to a Mafia Center: ${n} of ${hurt.length} Pokémon healed for ${money(n * 500)}.${n < hurt.length ? " You couldn't pay for the rest." : ""}`); }
+  if (shut) { const hurt = partyMons().filter((m) => !m.egg && !(isRanger() && m.temp) && ((m.hp != null && m.hp < monStats(m).hp) || m.status)), n = Math.min(hurt.length, Math.floor((S.money || 0) / 500)); hurt.slice(0, n).forEach((m) => { m.hp = null; m.status = ""; }); S.money -= n * 500; const free = !n && hurt.length; if (free) { hurt[0].hp = null; hurt[0].status = ""; } S.mafiaMsg = free ? `Mafia Center: couldn't pay, so only ${monName(hurt[0])} was healed.` : `Mafia Center: ${n} of ${hurt.length} healed for ${money(n * 500)}.`; log("note", free ? `The Pokémon Centers are shut, so you went to a Mafia Center. You couldn't pay, so the grunt healed just your ${monName(hurt[0])} and sent you away.` : `The Pokémon Centers are shut, so you went to a Mafia Center: ${n} of ${hurt.length} Pokémon healed for ${money(n * 500)}.${n < hurt.length ? " You couldn't pay for the rest." : ""}`); }
   else partyMons().forEach((m) => { m.hp = null; m.status = ""; });
   if (isRanger()) { rgr().energy = styler().energy; if (S.evRun) { const R0 = S.evRun, L0 = LOCMAP.get(R0.loc), e0 = L0 && L0.ev[R0.i]; if (e0) { S.events[eventKey(L0.n, e0)] = "failed"; log("fail", `Failed ${e0.t}: your Pokémon were all knocked out.`); } S.evRun = null; } }
   if (S.loc !== to) { S.loc = to; S.visited[to] = (S.visited[to] || 0) + 1; }
@@ -6214,7 +6217,7 @@ const GIVE_EVENTS = {
 const gaveFirst = (L, e) => !!(S.gave || {})[eventKey(L.n, e)];
 function openGive(locName, i) {
   const L = LOCMAP.get(locName), e = L.ev[i], g = GIVE_EVENTS[e.t]; if (!g) return;
-  const have = S.mons.filter((m) => !m.egg && dkey(m.sp).startsWith(dkey(g.sp)));
+  const have = S.mons.filter((m) => !m.egg && dkey(m.sp).startsWith(dkey(g.sp)) && !(isRanger() && (m.hq || !S.party.includes(m.id)))); // a Ranger hands over Pokémon with them, not ones at HQ
   const sel = new Set(g.many ? [] : have.slice(0, g.n).map((m) => m.id));
   const body = () => `<div class="small">${esc(e.d)}</div>
     ${have.length ? `<div class="stack">${have.map((m) => `<label class="check"><input type="checkbox" data-gv="${m.id}" ${sel.has(m.id) ? "checked" : ""}> ${esc(monName(m))} (${esc(m.sp)})</label>`).join("")}</div>` : `<div class="empty">You don't have a ${esc(g.sp)} yet.</div>`}
@@ -7232,7 +7235,10 @@ function rmAct(el) {
   const op = el.dataset.op, t = el.dataset.t, i = +el.dataset.i, M = MISSIONS.find((x) => x.t === t), R = rgr();
   const S0 = flatSteps(t)[i], st = S0 && S0.st;
   if (op === "start") { if (R.active && chainOf(R.active) !== chainOf(t)) { toast(`Finish or set aside ${R.active} first.`); return; } R.active = t; R.startRank = R.startRank || {}; if (R.startRank[t] == null) R.startRank[t] = rangerRank(); log("event", `Started the Ranger mission ${t}.`); return commit("Mission started"); }
-  if (op === "aside") { const ch = chainOf(t); if (ch === t) releaseMission(ch, "mission set aside"); R.active = null; return commit("Mission set aside"); }
+  if (op === "aside") { const ch = chainOf(t); if (ch === t) { releaseMission(ch, "mission set aside");
+      // recruits went back to the wild: their steps have to be done again
+      const P = MP(t); flatSteps(t).forEach((x) => { if (x.st.k === "cap" && x.st.keep && P.got[x.i]) P.got[x.i] = []; }); }
+    R.active = null; return commit("Mission set aside"); }
   if (op === "done") return finishMission(t, "passed");
   if (op === "fail") { if (!el.dataset.confirm) { el.dataset.confirm = "1"; el.textContent = "Tap again to fail it"; return; } return finishMission(t, "failed"); }
   if (!st) return;
@@ -7464,7 +7470,7 @@ function rangerWatch() {
   // points are assigned on a forced screen, even right after a rewards window
   if (rPendingRanks().length && !MODAL && !S.battle && !S.capture && !rangerWatch.t && !(typeof titleUp === "function" && titleUp())) rangerWatch.t = setTimeout(() => { rangerWatch.t = null; const p = rPendingRanks()[0]; if (p && !MODAL && isRanger()) openRankPoints(p[0]); }, 600);
   // everyone knocked out: back to Ranger Headquarters
-  if (!S.battle && !S.capture && !MODAL) { const team = fitMons().filter((m) => m.partner || m.temp), pm = team.find((m) => m.partner); if (team.length && (team.every((m) => m.hp === 0) || (pm && pm.hp === 0))) faintedPrompt(); }
+  if (!S.battle && !S.capture && !MODAL && !S.evRun) { const team = fitMons().filter((m) => m.partner || m.temp), pm = team.find((m) => m.partner); if (team.length && (team.every((m) => m.hp === 0) || (pm && pm.hp === 0))) faintedPrompt(); }
   const keys = Object.keys(S.events);
   if (!R.evSeen) R.evSeen = keys.slice();
   const fresh = keys.filter((k) => !R.evSeen.includes(k));
@@ -8181,7 +8187,7 @@ function outcomeX(L, e, res) {
   if (e.t === "Roadblock on Route C02") { S.flags.roadC02 = later(1); log("note", `The Mafia closed Route C02 South (to Route C03) until your next ${isRanger() ? "Ranger Rank" : "Badge"}.`); }
   if (e.t === "The Copper Poachers") { S.flags.copper = true; log("note", "The Poachers sold the Cufant to the Mafia. Expect Copperajah in the Mafia's ranks at the Raid."); }
   if (e.t === "Shady Business") { S.flags.shady = later(2); log("note", `The Mafia's money is flooding the shops: prices are up 20% until you earn 2 more ${isRanger() ? "Ranger Ranks" : "Badges"}.`); }
-  if (e.t === "Warehouse Security") { S.flags.c07 = later(1); const L7 = LOCMAP.get("Route C07"), back = (L7 && L7.cn.find((n) => LOCMAP.get(n).k === "town")) || (L7 && (L7.cn.find((n) => n === S.lastLoc && n !== "Mafia Warehouse") || L7.cn.find((n) => n !== "Mafia Warehouse"))) || (L7 && L7.cn[0]); if (back && S.loc === "Route C07") { S.loc = back; S.visited[back] = (S.visited[back] || 0) + 1; } log("note", `The Mafia threw you off Route C07${back ? " (back to " + back + ")" : ""}. You can't catch there until your next Badge.`); }
+  if (e.t === "Warehouse Security") { S.flags.c07 = later(1); const L7 = LOCMAP.get("Route C07"), back = (L7 && L7.cn.find((n) => LOCMAP.get(n).k === "town")) || (L7 && (L7.cn.find((n) => n === S.lastLoc && n !== "Mafia Warehouse") || L7.cn.find((n) => n !== "Mafia Warehouse"))) || (L7 && L7.cn[0]); if (back && S.loc === "Route C07") { S.loc = back; S.visited[back] = (S.visited[back] || 0) + 1; } log("note", `The Mafia threw you off Route C07${back ? " (back to " + back + ")" : ""}. You can't catch there until your next ${isRanger() ? "Ranger Rank" : "Badge"}.`); }
   if (e.t === "The Spiked Rare Candy") { const m = partyMons().find((x) => !x.egg); if (m) { m.fr = Math.max(0, (m.fr || 0) - 2); log("note", `${monName(m)} ate a Spiked Rare Candy and lost 2 Friendship.`); } }
   if (e.t === "The Rare Fossil Heist") { S.flags.jawStolen = true; log("note", "The Mafia stole the museum's Jaw Fossil for their Family Head. The museum has none left to sell."); }
 }
@@ -10059,7 +10065,7 @@ function openCenter(L) {
       const b = e.target.closest("[data-c]"); if (!b) return;
       if (b.dataset.c === "bye") { closeModal(); return; }
       if (b.dataset.c === "no") { npcSay(el, "We hope you excel!", `<button class="btn" data-c="bye">Bye!</button>`); return; }
-      if (S.capture || S.evRun) { npcSay(el, S.capture ? "You're in the middle of a capture! Finish it (or let it go) first." : "You're in the middle of an event. Finish its battles first!", `<button class="btn" data-c="bye">OK</button>`); return; }
+      if (S.capture || S.evRun || (isRanger() && rgBossBusy())) { npcSay(el, S.capture ? "You're in the middle of a capture! Finish it (or let it go) first." : "You're in the middle of an event. Finish its battles first!", `<button class="btn" data-c="bye">OK</button>`); return; }
       if (centersShut()) { if (isRanger()) { rgr().energy = styler().energy; save(); } mafiaCenter(el); return; }
       if (false) { npcSay(el, "I'm so sorry… the Mafia cut off our supplies. We can't heal Pokémon until you earn your next Badge.", `<button class="btn" data-c="bye">OK</button>`); return; }
       if (S.evRun) { npcSay(el, "You're in the middle of an event. Finish its battles first, then come see me!", `<button class="btn" data-c="bye">OK</button>`); return; }
@@ -10750,8 +10756,10 @@ function rgDesc(d) {
     .replace(/\+(\d+) Badges/g, "Rank $1+")
     .replace(/\(Before (\d+) Badges\)/g, "(before Rank $1)")
     .replace(/ You can still battle (?:her|him|them) if you like\./g, "")
-    .replace(/cannot be caught/g, "can be calmed with your Styler, but won't stay with you")
+    .replace(/cannot be (?:caught|captured)/g, "can be calmed with your Styler, but won't stay with you")
+    .replace(/if they have an open slot in their party/g, "and it will wait at Ranger Headquarters")
     .replace(/challenges you to a battle/g, "appears before you")
+    .replace(/ ?\(stats on h(?:is|er) Gym page\)/g, "")
     .replace(/,? ?\+1 (?:to your roll )?(?:for each|per) Ribbon[^.,)]*/gi, "")
     .replace(/your Rival (Chloe|Jayden|Leah)/g, "Trainer $1")
     .replace(/no matter how many Badges you have/g, "no matter what your Ranger Rank is")
@@ -10813,6 +10821,12 @@ setInterval(() => {
 
 // old Ranger saves: a hatched Pokémon left in the party goes to HQ
 setInterval(() => { if (typeof S === "undefined" || !S || !Array.isArray(S.mons) || typeof isRanger !== "function" || !isRanger() || S.hatchMig) return; S.hatchMig = true; S.mons.forEach((m) => { if (!m.egg && !m.partner && !m.temp && !m.hq && m.caught && m.caught.hatched && S.party.includes(m.id)) { m.hq = true; m.fr = Math.max(m.fr || 0, 3); S.party = S.party.filter((x) => x !== m.id); log("note", `${monName(m)} went to Ranger Headquarters.`); } }); save(); }, 2500);
+
+// a Ranger part-way through capturing an event's bosses (row Capture buttons): the event is in progress
+function rgBossBusy() {
+  if (typeof isRanger !== "function" || !isRanger() || !S.rgBoss) return false;
+  return Object.keys(S.rgBoss).some((k) => { if (!(S.rgBoss[k] > 0)) return false; const [loc, n, at] = k.split("|"), L = LOCMAP.get(loc), t = L && L.tr.find((x) => x.n === n && String(x.at) === String(at)), e = t && eventOfTrainer(L, t); if (!e || S.events[eventKey(L.n, e)]) { delete S.rgBoss[k]; return false; } return true; });
+}
 
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
@@ -11011,7 +11025,7 @@ function battleFinish(res) {
   if (res === "win") {
     const isBerry = /Berry/i.test(B.reward || "");
     const noPrize = !B.reward && B.sides.foe.trainer.hasTrainer && (B.kind === "trainer" || !!B.tour) && !B.contest && !B.isGym && !B.isBrain;
-    const pr = isBerry ? 0 : ((+(String(B.reward || "").replace(/[^\d]/g, "")) || 0) + (noPrize ? Math.max(100, pointsSpent() * 100) : 0)) * prizeMult() * moneyItemMult(B);
+    const pr = isBerry ? 0 : ((+(String(B.reward || "").replace(/[^\d]/g, "")) || 0) + (noPrize ? Math.max(100, battlePoints() * 100) : 0)) * prizeMult() * moneyItemMult(B);
     if (isBerry) { pendingAdd({ kind: "berry", loc: "", t: foeName }); after = () => berryPrize(foeName); }
     if (pr) S.money += pr;
     if (B.trKey) S.beaten[B.trKey] = (S.beaten[B.trKey] || 0) + 1;
@@ -11025,7 +11039,7 @@ function battleFinish(res) {
   } else if (res === "loss" && B.contest && !B.isBrain) { if (B.contest.hall) setLastHall(B.contest.hall); if (B.contestFoePl && B.contest.hall && !B.tour) { sendGift({ to: B.contestFoePl, kind: "ribbon", hall: B.contest.hall, type: B.contest.type }); log("event", `${B.sides.foe.trainer.name} won the ${B.contest.type} Ribbon; it goes to them with the next group code.`); } log("loss", `Lost the ${B.contest.type} Contest battle to ${foeName}.`);
   } else if (res === "loss") {
     if (B.isGym || B.isBrain) { const L = LOCMAP.get(B.loc), ev = L && L.ev.find((e) => (B.isGym ? / Gym$/ : /^The Battle \w+$/).test(e.t)); if (ev) S.events[eventKey(L.n, ev)] = "failed"; }
-    if (B.sides.foe.trainer.hasTrainer && B.kind !== "pvp") { const pay = lossPay(B, Math.min(S.money, Math.max(100, pointsSpent() * 100))); S.money -= pay; log("loss", `Lost to ${foeName}${pay ? " and paid " + money(pay) : ""}${kidMode() ? " (Child mode)" : ""}.`); }
+    if (B.sides.foe.trainer.hasTrainer && B.kind !== "pvp") { const pay = lossPay(B, Math.min(S.money, Math.max(100, battlePoints() * 100))); S.money -= pay; log("loss", `Lost to ${foeName}${pay ? " and paid " + money(pay) : ""}${kidMode() ? " (Child mode)" : ""}.`); }
     else log("loss", `Lost to ${B.kind === "wild" ? "a wild " + (activeOf(B, "foe")[0] || {}).name : foeName}.`);
   } else if (res === "fled") log("note", `A wild ${(activeOf(B, "foe")[0] || {}).name} got away${B.stale ? " (neither side could damage the other)" : ""}.`);
   else if (res === "draw") log("note", `Drew with ${foeName}: neither side could damage the other.`);
@@ -11447,7 +11461,7 @@ document.addEventListener("click", (e) => {
     case "ev-giveup": if (el.dataset.confirm) { const R = S.evRun, L = LOCMAP.get(R.loc), e = L.ev[R.i]; S.evRun = null; if (S.battle && S.battle.evRun) { S.battle = null; if (typeof BV !== "undefined" && BV.el && typeof bvClose === "function") bvClose(); if (S.tab === "battle") S.tab = "map"; } S.events[eventKey(L.n, e)] = "failed"; log("fail", `Gave up on ${e.t}.`); eventOutcome(L, e, "failed"); subwayAfter(false); commit("Event ended"); } else { el.dataset.confirm = "1"; el.textContent = "Tap again to give up"; } break;
     case "pending": pendingOpen(+el.dataset.k); break;
     case "ev-give": openGive(el.dataset.loc, +el.dataset.i); break;
-    case "ev-run": { const lo = el.dataset.loc, ii = +el.dataset.i; if (S.evRun && S.evRun.loc === lo && S.evRun.i === ii) { startEventRun(lo, ii); break; } const L9 = LOCMAP.get(lo), e9 = L9 && L9.ev[ii]; modal(e9 ? e9.t : "Event", `<div>Start the event battles now?</div><div class="small muted">They run back to back: no healing and no leaving until they're done. Losing fails the event.</div><div class="row"><button class="btn primary" data-go>Start</button><button class="btn ghost" data-no>Not yet</button></div>`, (m) => { $("[data-go]", m).addEventListener("click", () => { closeModal(); startEventRun(lo, ii); }); $("[data-no]", m).addEventListener("click", closeModal); }); break; }
+    case "ev-run": { const lo = el.dataset.loc, ii = +el.dataset.i; if (S.evRun && S.evRun.loc === lo && S.evRun.i === ii) { startEventRun(lo, ii); break; } const L9 = LOCMAP.get(lo), e9 = L9 && L9.ev[ii]; modal(e9 ? e9.t : "Event", `<div>Start the event ${isRanger() ? "now" : "battles now"}?</div><div class="small muted">${isRanger() ? "It runs start to finish: no healing and no leaving until it's done. Losing a battle or letting a Pokémon go fails the event." : "They run back to back: no healing and no leaving until they're done. Losing fails the event."}</div><div class="row"><button class="btn primary" data-go>Start</button><button class="btn ghost" data-no>Not yet</button></div>`, (m) => { $("[data-go]", m).addEventListener("click", () => { closeModal(); startEventRun(lo, ii); }); $("[data-no]", m).addEventListener("click", closeModal); }); break; }
     case "fish-cast": UI.fishCast = true; openEncounter(); break;
     case "ct-pick": if (UI.contest && !isRanger() && !S.pbTutorial && !(S.contestsEntered > 0)) { pokeblockTutorial(UI.contest); break; } if (UI.contest && (S.mons.find((x) => x.id === UI.contest.mon) || {}).hp === 0) { toast("That Pokémon has fainted. Heal it at a Pokémon Center first."); break; } if (UI.contest) { UI.contest.picked = true; log("note", `Entered ${monName(S.mons.find((x) => x.id === UI.contest.mon) || {}) || "a Pokémon"} in the ${UI.contest.type} Contest at ${S.loc}.`); } commit(); break;
     case "tour-retry": tourRetryGo(el.dataset.k); break;
@@ -11508,7 +11522,7 @@ document.addEventListener("click", (e) => {
     case "battle-mission": { const m = MISSIONS[+el.dataset.i], x = missionMons(m)[+el.dataset.k]; newBattle({ kind: "boss", title: `${x.name} — ${m.t}`, eventName: m.t, foeTrainer: { hasTrainer: false, name: x.name, obedience: 0, intuition: 0, will: 0 }, foeMons: [makeFighter({ name: x.name, sp: x.name, types: x.types, hp: x.hp, atk: x.atk, def: x.def, spd: x.spd, ability: x.ab, abilities: [x.ab].filter(Boolean) }, "foe")] }); break; }
     case "battle-mtr": { const m = MISSIONS[+el.dataset.i], t = m.tr[+el.dataset.k]; newBattle({ kind: "trainer", title: `${t.n} — ${m.t}`, eventName: m.t, reward: t.rw, foeTrainer: { hasTrainer: true, name: t.n, obedience: t.o, intuition: t.i, will: t.wl }, foeMons: t.m.map((x) => makeFighter({ name: x.name, sp: x.name, types: x.types, hp: x.hp, atk: x.atk, def: x.def, spd: x.spd, ability: x.ab, abilities: [x.ab, x.hidden].filter(Boolean) }, "foe")) }); break; }
     case "sty-e": rgr().energy = clamp(stylerEnergy() + +el.dataset.v, 0, styler().energy); commit(); break;
-    case "sty-charge": if (S.capture || S.evRun) { toast(S.capture ? "Finish the capture first." : "Finish the event first."); break; } rgr().energy = styler().energy; if (centersShut() && S.loc !== "Ranger Headquarters") { log("note", `Recharged the Styler at ${S.loc}. The Pokémon Center can't heal (the Mafia cut its supplies): use the Mafia Center or Ranger Headquarters.`); commit("Styler recharged"); break; } fitMons().forEach((m) => { m.hp = null; m.status = ""; }); log("note", `Recharged the Styler and healed up at ${S.loc}.`); commit("Styler recharged"); break;
+    case "sty-charge": if (S.capture || S.evRun || rgBossBusy()) { toast(S.capture ? "Finish the capture first." : "Finish the event first."); break; } rgr().energy = styler().energy; if (centersShut() && S.loc !== "Ranger Headquarters") { log("note", `Recharged the Styler at ${S.loc}. The Pokémon Center can't heal (the Mafia cut its supplies): use the Mafia Center or Ranger Headquarters.`); commit("Styler recharged"); break; } fitMons().forEach((m) => { m.hp = null; m.status = ""; }); log("note", `Recharged the Styler and healed up at ${S.loc}.`); commit("Styler recharged"); break;
     case "rg-adj": { const b = rangerRank(); rgr().adj = (+rgr().adj || 0) + +el.dataset.v; rankCheck(b); commit(); break; }
     case "sb-release": { const m = S.mons.find((x) => x.id === el.dataset.id); if (m && keepBlock(m, true)) { toast(keepBlock(m, true)); break; } if (m) { S.mons = S.mons.filter((x) => x !== m); S.party = S.party.filter((x) => x !== m.id); log("note", m.fromHQ ? `Sent ${monName(m)} back to Ranger Headquarters.` : `Released ${monName(m)} back to the wild.`); if (isRanger()) rmSyncKeep(); } commit(); break; }
     case "cap-throw": capThrow(); break;
