@@ -3429,7 +3429,7 @@ function openEncounter() {
   const limited = !fishing && !(S.safari && S.loc === "Safari Zone") && !hasPC(L) && !isRanger(); // a Ranger's searches cost Styler Energy instead
   const evW = limited ? eventWildHere() : [];
   if (limited && encLeft(S.loc) <= 0 && !evW.length) { toast(`No wild encounters left on ${S.loc}. Visit a town with a Pokémon Center to reset them.`); return; }
-  modal(fishing ? "Fishing Challenge" : "Look for wild Pokémon", `<div class="small muted">Roll a d20. You can meet any Pokémon here with a Rate at or below your roll.${hasRod() ? " The Fishing Rod lowers Water types' Rate by 5." : ""}${encounterBonus() ? ` Bonuses add +${encounterBonus()}.` : ""}</div>${fieldNote()}
+  modal(fishing ? "Fishing Challenge" : "Look for wild Pokémon", `<div class="small muted">${isRanger() ? `Each search costs 1 Styler Energy (${stylerEnergy()} left). ` : ""}Roll a d20. You can meet any Pokémon here with a Rate at or below your roll.${hasRod() ? " The Fishing Rod lowers Water types' Rate by 5." : ""}${encounterBonus() ? ` Bonuses add +${encounterBonus()}.` : ""}</div>${fieldNote()}
     <div class="row"><label class="f" for="en-r" style="width:140px">Your d20 roll<input id="en-r" type="number" min="1" max="20" placeholder="auto"></label>${honey ? `<label class="check"><input type="checkbox" id="en-h"> Use Honey (+3)</label>` : ""}${snack ? `<label class="check"><input type="checkbox" id="en-s"> Use a Poké Snack (+5)</label>` : ""}${limited ? `<span class="pill">${encLeft(S.loc)} of ${ENC_PER_ROUTE} encounters left here</span>` : ""}${evW.length ? `<label class="check"><input type="checkbox" id="en-ev" ${encLeft(S.loc) <= 0 ? "checked disabled" : ""}> For an event (${esc(evW.join(", "))}): doesn't use an encounter</label>` : ""}<button class="btn primary" data-en>Roll</button></div>
     <div id="en-out"></div>`, (el) => {
     $("[data-en]", el).addEventListener("click", () => {
@@ -3438,6 +3438,7 @@ function openEncounter() {
       const forEv = $("#en-ev", el) && $("#en-ev", el).checked;
       const third = limited && !forEv && encLeft(S.loc) === 1;
       if (limited && !forEv) { if (encLeft(S.loc) <= 0) { toast("No wild encounters left here."); return; } useEncounter(); }
+      if (isRanger() && S.settings.view !== "gm") { if (stylerEnergy() <= 0) { toast("Your Styler is out of Energy. Recharge first."); return; } rgr().energy = stylerEnergy() - 1; }
       if (h) { r += 3; S.bag["Honey"]--; if (!S.bag["Honey"]) delete S.bag["Honey"]; save(); }
       const sn = $("#en-s", el) && $("#en-s", el).checked;
       if (sn) { r += 5; S.bag["Poké Snack"]--; if (!S.bag["Poké Snack"]) delete S.bag["Poké Snack"]; }
@@ -4548,7 +4549,7 @@ function vRanger() {
       <div class="tile"><span class="lbl">Energy</span><span class="big">${en}<span class="muted small">/${sty.energy}</span></span></div>
       <div class="tile"><span class="lbl">Standby</span><span class="big">${standbyFree().length}<span class="muted small">/${sty.standby}</span></span></div></div>
     <div class="hpbar ${en / sty.energy < 0.25 ? "low" : en / sty.energy < 0.5 ? "mid" : ""}"><i style="width:${(en / sty.energy) * 100}%"></i></div>
-    <div class="row">${S.settings.view === "gm" ? `<button class="btn sm" data-act="sty-e" data-v="-1">−1 Energy</button><button class="btn sm" data-act="sty-e" data-v="1">+1 Energy</button>` : ""}<button class="btn sm primary" data-act="sty-charge" ${canCharge ? "" : "disabled"}>Recharge and heal</button></div>
+    <div class="row">${S.settings.view === "gm" ? `<button class="btn sm" data-act="sty-e" data-v="-1">−1 Energy</button><button class="btn sm" data-act="sty-e" data-v="1">+1 Energy</button>` : ""}<button class="btn sm primary" data-act="sty-charge" ${canCharge ? "" : "disabled"}>${typeof centersShut === "function" && centersShut() && S.loc !== "Ranger Headquarters" ? "Recharge the Styler" : "Recharge and heal"}</button></div>
     <div class="tiny muted">Recharge the Styler and heal your Pokémon at Ranger Headquarters or any Pokémon Center.</div>
     <details class="small"><summary>Rank table</summary><div class="scroll-x"><table class="t"><thead><tr><th>Rank</th><th>Modifier</th><th class="n">Needs</th><th class="n">Energy</th></tr></thead><tbody>${RANK_NOTE.map((n, i) => `<tr class="${i + 1 === r ? "ap-top" : ""}"><td>${i + 1}</td><td>${esc(n)}</td><td class="n">${RANK_REQ[i] || ""}</td><td class="n">${RANK_ENERGY[i]}</td></tr>`).join("")}</tbody></table></div>
       ${S.settings.view === "gm" ? `<div class="row small">Adjust the count by hand: <button class="btn sm" data-act="rg-adj" data-v="-1">−1</button><button class="btn sm" data-act="rg-adj" data-v="1">+1</button>${rgr().adj ? `<span class="muted">(${rgr().adj > 0 ? "+" : ""}${rgr().adj})</span>` : ""}</div>` : ""}
@@ -5950,6 +5951,7 @@ function startEventRun(locName, i) {
   if (S.evRun) { if (S.evRun.loc === L.n && S.evRun.i === i) return evRunNext(); toast("Finish the event you're in the middle of first."); return; }
   if (!fitMons().some((m) => m.hp == null || m.hp > 0)) { toast("None of your Pokémon can battle. Heal at a Pokémon Center before you start this event."); return; }
   if (e.t === "The Hitmon Challenge") return hitmonStart(locName, i);
+  if (isRanger() && stylerEnergy() <= 0 && !(S.evRun && S.evRun.loc === locName && S.evRun.i === i)) { toast("Your Styler is out of Energy. Recharge before you start an event."); return; }
   if (isRanger() && typeof rangerOff === "function" && rangerOff(L, e)) { toast("Rangers don't take on Trainer battles like this one."); return; }
   if (GIVE_EVENTS[e.t] && GIVE_EVENTS[e.t].first && !gaveFirst(L, e)) { toast(`Hand over the ${GIVE_EVENTS[e.t].sp} first.`); return; }
   const rank = (t) => /Mafia Head|Pirate Captain/i.test(t.n) ? 4 : /Principal|Executive|Officer|Leader|Boss/i.test(t.n) ? 3 : /Teacher|Admin/i.test(t.n) ? 2 : !t.rw && !/^(Trainer|Rival|Mafia|Coordinator|Student)/.test(t.n) ? 2.5 : 0;
@@ -6534,7 +6536,7 @@ function hqPartner(id) {
   const m = S.mons.find((x) => x.id === id), old = partnerMon(); if (!m) return;
   if (S.battle || S.capture) { toast("Finish the battle first."); return; }
   if (old) { old.partner = false; old.hq = true; S.party = S.party.filter((x) => x !== old.id); }
-  m.partner = true; delete m.hq; S.party = [m.id].concat(S.party.filter((x) => x !== m.id)).slice(0, 6);
+  m.partner = true; delete m.hq; S.party = [m.id].concat(S.party.filter((x) => x !== m.id));
   log("note", `${monName(m)} is your new Partner${old ? `. ${monName(old)} stays at Ranger Headquarters` : ""}.`);
   commit(`${monName(m)} is your Partner`);
 }
@@ -7189,8 +7191,11 @@ function rangerOK(m, ms, loc) {
   const free = !m.mtag && !m.capFor && !m.sbUse;
   if (ms) { const ch = chainOf(ms.t); return free || m.mtag === ch || m.capFor === ch; }
   if (free) return true;
-  const ev = S.evRun && LOCMAP.get(S.evRun.loc), chainK = (k) => String(k || "").replace(/ Part \d+(?=\|)/, "").replace(/\|[^|]*$/, "");
-  return !!(ev && m.sbUse && chainK(m.sbUse.slice(3)) === chainK(eventKey(ev.n, ev.ev[S.evRun.i]))); // a helper stays for the rest of the event it joined
+  const ev = S.evRun && LOCMAP.get(S.evRun.loc), chainK = (k) => (String(k || "").split("|")[1] || "").replace(/ Part \d+$/, ""); // the same story, wherever its Parts are
+  if (!m.sbUse) return false;
+  if (ev && chainK(m.sbUse.slice(3)) === chainK(eventKey(ev.n, ev.ev[S.evRun.i]))) return true;
+  // picking the team for a later Part of the same event (before its battles start)
+  const LL = LOCMAP.get(loc); return !!(LL && LL.ev.some((e) => !S.events[eventKey(LL.n, e)] && chainK(eventKey(LL.n, e)) === chainK(m.sbUse.slice(3)))); // a helper stays for the rest of the event it joined
 }
 function rgTag(m) {
   const R = rgr();
@@ -7335,7 +7340,8 @@ function rgCapDone(C, ok, m) {
   if (C.hikers) { const L = LOCMAP.get(C.hikers.loc), e = L && L.ev.find((x) => x.t === C.hikers.t); S.capture = null; S.enc = null; if (!e) { commit(); return true; } const k = eventKey(L.n, e); if (!ok) { S.events[k] = "failed"; log("fail", `Failed ${e.t} at ${L.n}: the Golem got away.`); commit("It escaped"); return true; } log("note", "Calmed the Golem blocking the trail, then let it go."); S.flags = S.flags || {}; S.flags.hikersGolem = (partyMons().find((x) => x.partner) || {}).id || true; commit("Calmed the Golem"); setTimeout(() => hikersRoll(L, e, k), 300); return true; }
   if (C.boss) {
     const { loc, i, run } = C.boss, L = LOCMAP.get(loc), t = L.tr[i], k = L.n + "|" + t.n + "|" + t.at;
-    if (run) { { const e0 = eventOfTrainer(L, t); if (e0 && partnerMon()) evFrAdd(eventKey(L.n, e0), [partnerMon().id]); } const fn = evRunAfter(ok ? "caught" : "loss", { loc, trIdx: i, canCatch: false }); if (ok) S.beaten[k] = (S.beaten[k] || 0) + 1; S.capture = null; commit(ok ? "Calmed!" : "It escaped"); if (fn) fn(); return true; }
+    if (run) { { const e0 = eventOfTrainer(L, t); if (e0 && partnerMon()) evFrAdd(eventKey(L.n, e0), [partnerMon().id]); } if (ok && t.m.length > 1) { const BB = (S.rgBoss = S.rgBoss || {}); BB[k] = (BB[k] || 0) + 1; if (BB[k] < t.m.length) { S.capture = null; S.enc = null; commit(`Calmed the ${C.t.name}`); toast(`${BB[k]} of ${t.m.length} calmed. Next one!`); setTimeout(() => rgBossCapture(loc, i, true), 400); return true; } delete BB[k]; } // a boss with several Pokémon: capture them all
+      const fn = evRunAfter(ok ? "caught" : "loss", { loc, trIdx: i, canCatch: false }); if (ok) S.beaten[k] = (S.beaten[k] || 0) + 1; S.capture = null; commit(ok ? "Calmed!" : "It escaped"); if (fn) fn(); return true; }
     if (!ok) { rgEventFail(L, t, `${C.t.name} escaped`); S.capture = null; S.enc = null; commit("It escaped"); return true; }
     { const e0 = eventOfTrainer(L, t); if (e0 && partnerMon()) evFrAdd(eventKey(L.n, e0), [partnerMon().id]); }
     const B = (S.rgBoss = S.rgBoss || {}); B[k] = (B[k] || 0) + 1;
@@ -7357,6 +7363,7 @@ function rgEventFail(L, t, why) {
   const k = eventKey(L.n, e); if (S.events[k]) return;
   S.events[k] = "failed"; delete (S.rgBoss || {})[L.n + "|" + t.n + "|" + t.at];
   log("fail", `Failed ${e.t}: ${why}.`);
+  if (typeof eventOutcome === "function") eventOutcome(L, e, "failed"); // "win or lose" rewards
 }
 function rgHelperUse(B) {
   const ids = new Set((B.sides.me.mons || []).filter((f) => f.acted || f.fainted || B.ms || S.evRun).map((f) => f.monId).filter(Boolean)), gone = [];
@@ -7390,7 +7397,7 @@ function rgBossCapture(loc, i, run) {
   const L = LOCMAP.get(loc), t = L.tr[i]; if (!t) return;
   { const e0 = eventOfTrainer(L, t), st0 = e0 && S.events[eventKey(L.n, e0)]; if (st0 && !run && !REPEATABLE.test(e0.t)) { toast(st0 === "failed" ? `${e0.t} was failed: it can't be tried again.` : `${e0.t} is already done.`); return; } }
   if (nidoAlly(L, t) === false) return;
-  const row = t.m[run ? 0 : Math.min(rgBossGot(L, t), t.m.length - 1)];
+  const row = t.m[Math.min(rgBossGot(L, t), t.m.length - 1)];
   startCapture({ name: row[0], types: row[1], hp: row[2], atk: row[3], def: row[4], spd: row[5], ab: row[6] }, `${t.e || t.n} · ${L.n}`);
   if (!S.capture) return; S.capture.boss = { loc, i, run: !!run }; save();
 }
@@ -7465,7 +7472,7 @@ function rangerWatch() {
     R.evSeen = keys.slice();
     // wild Pokémon stay through a multi-part event; otherwise they go back to the wild
     const pending = fresh.some((k) => { const [loc, title] = k.split("|"), L = LOCMAP.get(loc), m = title.match(/^(.*) Part (\d+)$/); return m && L && L.ev.some((e) => e.t === `${m[1]} Part ${+m[2] + 1}` && !S.events[eventKey(L.n, e)]); });
-    if (!pending) { const chK = (k) => String(k || "").replace(/ Part \d+(?=\|)/, "").replace(/\|[^|]*$/, ""); const st = standbyMons().filter((m) => (m.sbUse && fresh.some((f) => chK(f) === chK(m.sbUse.slice(3)))) || (m.pickAt && Date.now() - m.pickAt < 900000)); if (st.length) { const ids = new Set(st.map((m) => m.id)); S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => !ids.has(id)); log("note", `${st.map(monName).join(", ")} ${st.every((m) => m.fromHQ) ? "went back to Ranger Headquarters" : "returned to the wild"} (event over).`); } }
+    if (!pending) { const chK = (k) => (String(k || "").split("|")[1] || "").replace(/ Part \d+$/, ""); const st = standbyMons().filter((m) => (m.sbUse && fresh.some((f) => chK(f) === chK(m.sbUse.slice(3)))) || (m.pickAt && Date.now() - m.pickAt < 900000)); if (st.length) { const ids = new Set(st.map((m) => m.id)); S.mons = S.mons.filter((m) => !ids.has(m.id)); S.party = S.party.filter((id) => !ids.has(id)); log("note", `${st.map(monName).join(", ")} ${st.every((m) => m.fromHQ) ? "went back to Ranger Headquarters" : "returned to the wild"} (event over).`); } }
     save();
   }
 }
@@ -7620,8 +7627,9 @@ function faintedPrompt() {
     MODAL.lock = "Heal your Pokémon first.";
     $("[data-heal-go]", el).addEventListener("click", () => {
       MODAL.lock = null;
-      partyMons().forEach((m) => { m.hp = null; m.status = ""; }); rgr().energy = styler().energy;
       if (S.loc !== to) { S.loc = to; S.visited[to] = (S.visited[to] || 0) + 1; }
+      if (to !== "Ranger Headquarters" && typeof centersShut === "function" && centersShut()) { closeModal(); sendToCenter(); return; }
+      partyMons().forEach((m) => { m.hp = null; m.status = ""; }); rgr().energy = styler().energy;
       log("note", `Took your fainted Pokémon to ${to} to heal, and recharged the Styler.`);
       closeModal(); commit(`Healed at ${to}`);
     });
@@ -7709,6 +7717,7 @@ function styHit(C) {
 function openStylerGame(go) {
   const C = S.capture; if (!C) return;
   if (stylerEnergy() <= 0) { toast("Your Styler is out of Energy."); return; }
+  if (C.sgEnd && !go) { const rest = Math.round((C.sgEnd - Date.now()) / 1000); if (rest <= 0) { styTimeOut(C); return; } openStylerGame(true); return; } // a game already under way picks up where it was
   if (!go) {
     const rk = rangerRank(), sec = rk >= 6 ? 90 : 60, nd = Math.max(1, styLoopsNeed(C) - ((C.aMod || 0) > 0 ? Math.max(1, Math.floor(C.aMod / 3)) : 0));
     modal("Capture Styler", `<div class="row" style="gap:12px;align-items:center">${sprite(C.t.name, "lg", C.enc && C.enc.shiny)}<div class="stack">
@@ -7753,7 +7762,8 @@ function openStylerGame(go) {
   // the line
   const maxLen = Math.min(W, H) * (3.6 + 0.15 * rank) + 30 * rStat("power");
   let paused = false;
-  let pts = [], down = false, finger = null, loops = 0, flash = null, hurt = 0, over = false, left = secs, last = performance.now();
+  if (!C.sgEnd) { C.sgEnd = Date.now() + secs * 1000; save(); }
+  let pts = [], down = false, finger = null, loops = 0, flash = null, hurt = 0, over = false, left = C.sgEnd ? Math.max(1, (C.sgEnd - Date.now()) / 1000) : secs, last = performance.now();
   const len = () => { let s = 0; for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return s; };
   const trim = () => { while (pts.length > 2 && len() > maxLen) pts.shift(); };
   const hit = (a, b, c, d) => { const den = (b.x - a.x) * (d.y - c.y) - (b.y - a.y) * (d.x - c.x); if (!den) return null; const u = ((c.x - a.x) * (d.y - c.y) - (c.y - a.y) * (d.x - c.x)) / den, v = ((c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x)) / den; return u > 0 && u < 1 && v > 0 && v < 1 ? { x: a.x + u * (b.x - a.x), y: a.y + u * (b.y - a.y) } : null; };
@@ -7815,7 +7825,7 @@ function openStylerGame(go) {
     });
   });
   function end(won) {
-    if (over) return; over = true;
+    if (over) return; over = true; delete C.sgEnd;
     msg(won ? `${C.t.name} was captured!` : left <= 0 ? `${C.t.name} got away: time's up.` : `${C.t.name} escaped: the Styler is out of Energy.`);
     setTimeout(() => {
       close();
@@ -7868,6 +7878,21 @@ function openStylerGame(go) {
   msg(`Circle ${C.t.name} ${need} time${need === 1 ? "" : "s"}. Don't let it touch your line!`);
   requestAnimationFrame(frame);
 }
+
+// a minigame whose clock ran out while the app was closed: it counts as time running out
+function styTimeOut(C) {
+  delete C.sgEnd; assistClear(C, true);
+  rgr().energy = Math.max(0, stylerEnergy() - 1);
+  log("note", `The wild ${C.t.name} got away from the Capture Styler (time ran out: −1 Energy).`);
+  S.capture = null; S.enc = null;
+  if (rgCapDone(C, false)) return;
+  save(); render();
+}
+// after a reload mid-game: the game comes back (or times out), the clock doesn't restart
+setInterval(() => {
+  if (typeof S === "undefined" || !S || !S.capture || !S.capture.sgEnd || document.querySelector(".sty-game") || (typeof titleUp === "function" && titleUp()) || (typeof MODAL !== "undefined" && MODAL)) return;
+  if (Date.now() >= S.capture.sgEnd) styTimeOut(S.capture); else openStylerGame(true);
+}, 800);
 
 /* ================= Dice animation (Settings → Dice animation) =================
    Every roll made while you play is collected; when the action finishes, the dice tumble and land on their results. */
@@ -8152,8 +8177,8 @@ function outcomeX(L, e, res) {
   const later = (n) => (isRanger() ? { rank: rangerRank() + n } : { lv: ownLevel() + n });
   if (e.t === "The Jewelry Chase Down") { S.flags.jewelLost = true; log("note", "The Mafia got away with the jewels. Mafia Executives now carry a Hyper Potion."); }
   if (e.t === "The Supply Chain Disruption") { S.flags.centersShut = later(1); log("note", `The Mafia cut off the Pokémon Centers' supplies. They reopen after your next ${isRanger() ? "Ranger Rank" : "Badge"}.`+" Stock up on healing items!"); }
-  if (e.t === "Attack on the Construction Site") { S.flags.towerLate = true; log("note", "The Mafia stole the Conkeldurr's Poké Balls. Trainer Tower is delayed until 8 Badges."); }
-  if (e.t === "Roadblock on Route C02") { S.flags.roadC02 = later(1); log("note", "The Mafia closed Route C02 South (to Route C03) until your next Badge."); }
+  if (e.t === "Attack on the Construction Site" && !isRanger()) { S.flags.towerLate = true; log("note", "The Mafia stole the Conkeldurr's Poké Balls. Trainer Tower is delayed until 8 Badges."); }
+  if (e.t === "Roadblock on Route C02") { S.flags.roadC02 = later(1); log("note", `The Mafia closed Route C02 South (to Route C03) until your next ${isRanger() ? "Ranger Rank" : "Badge"}.`); }
   if (e.t === "The Copper Poachers") { S.flags.copper = true; log("note", "The Poachers sold the Cufant to the Mafia. Expect Copperajah in the Mafia's ranks at the Raid."); }
   if (e.t === "Shady Business") { S.flags.shady = later(2); log("note", `The Mafia's money is flooding the shops: prices are up 20% until you earn 2 more ${isRanger() ? "Ranger Ranks" : "Badges"}.`); }
   if (e.t === "Warehouse Security") { S.flags.c07 = later(1); const L7 = LOCMAP.get("Route C07"), back = (L7 && L7.cn.find((n) => LOCMAP.get(n).k === "town")) || (L7 && (L7.cn.find((n) => n === S.lastLoc && n !== "Mafia Warehouse") || L7.cn.find((n) => n !== "Mafia Warehouse"))) || (L7 && L7.cn[0]); if (back && S.loc === "Route C07") { S.loc = back; S.visited[back] = (S.visited[back] || 0) + 1; } log("note", `The Mafia threw you off Route C07${back ? " (back to " + back + ")" : ""}. You can't catch there until your next Badge.`); }
@@ -10034,6 +10059,7 @@ function openCenter(L) {
       const b = e.target.closest("[data-c]"); if (!b) return;
       if (b.dataset.c === "bye") { closeModal(); return; }
       if (b.dataset.c === "no") { npcSay(el, "We hope you excel!", `<button class="btn" data-c="bye">Bye!</button>`); return; }
+      if (S.capture || S.evRun) { npcSay(el, S.capture ? "You're in the middle of a capture! Finish it (or let it go) first." : "You're in the middle of an event. Finish its battles first!", `<button class="btn" data-c="bye">OK</button>`); return; }
       if (centersShut()) { if (isRanger()) { rgr().energy = styler().energy; save(); } mafiaCenter(el); return; }
       if (false) { npcSay(el, "I'm so sorry… the Mafia cut off our supplies. We can't heal Pokémon until you earn your next Badge.", `<button class="btn" data-c="bye">OK</button>`); return; }
       if (S.evRun) { npcSay(el, "You're in the middle of an event. Finish its battles first, then come see me!", `<button class="btn" data-c="bye">OK</button>`); return; }
@@ -10726,6 +10752,7 @@ function rgDesc(d) {
     .replace(/ You can still battle (?:her|him|them) if you like\./g, "")
     .replace(/cannot be caught/g, "can be calmed with your Styler, but won't stay with you")
     .replace(/challenges you to a battle/g, "appears before you")
+    .replace(/,? ?\+1 (?:to your roll )?(?:for each|per) Ribbon[^.,)]*/gi, "")
     .replace(/your Rival (Chloe|Jayden|Leah)/g, "Trainer $1")
     .replace(/no matter how many Badges you have/g, "no matter what your Ranger Rank is")
     .replace(/Defeat the wild Golem on the trail/g, "Calm the wild Golem on the trail with your Styler")
@@ -10774,7 +10801,7 @@ setInterval(() => {
   let ch = false;
   Object.keys(S.hqOut).forEach((id) => {
     const cur = S.mons.find((x) => x.id === id);
-    if (cur && cur.temp) return; // still on Standby
+    if (cur && cur.temp) { S.hqOut[id] = JSON.parse(JSON.stringify(cur)); return; } // still on Standby: keep its progress
     const m = cur || S.hqOut[id]; delete S.hqOut[id]; ch = true;
     delete m.temp; delete m.fromHQ; delete m.sbUse; delete m.capFor; delete m.mtag; delete m.pickAt; m.hp = null; m.status = ""; m.hq = true;
     if (!cur) S.mons.push(m);
@@ -10783,6 +10810,9 @@ setInterval(() => {
   });
   if (ch) { save(); if (typeof render === "function") render(); }
 }, 1500);
+
+// old Ranger saves: a hatched Pokémon left in the party goes to HQ
+setInterval(() => { if (typeof S === "undefined" || !S || !Array.isArray(S.mons) || typeof isRanger !== "function" || !isRanger() || S.hatchMig) return; S.hatchMig = true; S.mons.forEach((m) => { if (!m.egg && !m.partner && !m.temp && !m.hq && m.caught && m.caught.hatched && S.party.includes(m.id)) { m.hq = true; m.fr = Math.max(m.fr || 0, 3); S.party = S.party.filter((x) => x !== m.id); log("note", `${monName(m)} went to Ranger Headquarters.`); } }); save(); }, 2500);
 
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
@@ -11430,7 +11460,7 @@ document.addEventListener("click", (e) => {
     case "hq-standby": hqStandby(el.dataset.id); break;
     case "ev-gift": evGift(el.dataset.loc, +el.dataset.i); break;
     case "dc-goto": if (S.loc !== el.dataset.loc) { toast(`Travel to ${el.dataset.loc} to use its Day Care.`); break; } S.tab = "map"; render(); setTimeout(() => { const c = [...document.querySelectorAll(".card h2")].find((h) => h.textContent === "Pokémon Day Care"); if (c) c.scrollIntoView({ block: "start" }); }, 50); break;
-    case "ferry": { const p = +el.dataset.p; if (S.money < p) { toast(`The ferry costs ${money(p)}.`); break; } S.money -= p; log("event", `Paid ${money(p)} for the ferry.`); travel(el.dataset.to, "Took the ferry to"); break; }
+    case "ferry": { const p = +el.dataset.p; if (S.evRun || S.capture) { toast(S.capture ? "Finish the capture (or let it go) before you leave." : "Finish the event's battles before you leave."); break; } if (S.money < p) { toast(`The ferry costs ${money(p)}.`); break; } S.money -= p; log("event", `Paid ${money(p)} for the ferry.`); travel(el.dataset.to, "Took the ferry to"); break; }
     case "ev-view": UI.ev = { loc: el.dataset.loc, i: +el.dataset.i }; S.tab = "events"; save(); render(); window.scrollTo(0, 0); break;
     case "bmode": UI.bmode = el.dataset.v; render(); break;
     case "egg-add": openAddEgg(); break;
@@ -11480,7 +11510,7 @@ document.addEventListener("click", (e) => {
     case "sty-e": rgr().energy = clamp(stylerEnergy() + +el.dataset.v, 0, styler().energy); commit(); break;
     case "sty-charge": if (S.capture || S.evRun) { toast(S.capture ? "Finish the capture first." : "Finish the event first."); break; } rgr().energy = styler().energy; if (centersShut() && S.loc !== "Ranger Headquarters") { log("note", `Recharged the Styler at ${S.loc}. The Pokémon Center can't heal (the Mafia cut its supplies): use the Mafia Center or Ranger Headquarters.`); commit("Styler recharged"); break; } fitMons().forEach((m) => { m.hp = null; m.status = ""; }); log("note", `Recharged the Styler and healed up at ${S.loc}.`); commit("Styler recharged"); break;
     case "rg-adj": { const b = rangerRank(); rgr().adj = (+rgr().adj || 0) + +el.dataset.v; rankCheck(b); commit(); break; }
-    case "sb-release": { const m = S.mons.find((x) => x.id === el.dataset.id); if (m && keepBlock(m, true)) { toast(keepBlock(m, true)); break; } if (m) { S.mons = S.mons.filter((x) => x !== m); S.party = S.party.filter((x) => x !== m.id); log("note", `Released ${monName(m)} back to the wild.`); if (isRanger()) rmSyncKeep(); } commit(); break; }
+    case "sb-release": { const m = S.mons.find((x) => x.id === el.dataset.id); if (m && keepBlock(m, true)) { toast(keepBlock(m, true)); break; } if (m) { S.mons = S.mons.filter((x) => x !== m); S.party = S.party.filter((x) => x !== m.id); log("note", m.fromHQ ? `Sent ${monName(m)} back to Ranger Headquarters.` : `Released ${monName(m)} back to the wild.`); if (isRanger()) rmSyncKeep(); } commit(); break; }
     case "cap-throw": capThrow(); break;
     case "sty-game": openStylerGame(); break;
     case "rm": rmAct(el); break;
@@ -11545,7 +11575,7 @@ document.addEventListener("click", (e) => {
     }
     case "dmax": { const c = currentFighter(B); snap(B); dynamax(B, c); save(); render(); break; }
     case "b-run": if (B.hikers || (B.evRun && !B.evCatch && B.kind === "wild")) { toast("You can't run from an event battle."); break; } if (B.kind === "wild" && typeof abTrapped === "function" && abTrapped(B, "me")) { toast(abTrapped(B, "me")); break; } if (B.kind === "wild") { B.over = "ran"; B.log.push("Got away safely."); } else B.over = "end"; save(); render(); break;
-    case "b-forfeit": if (!el.dataset.sure) { el.dataset.sure = "1"; el.textContent = "Tap again to forfeit"; setTimeout(() => { el.dataset.sure = ""; }, 3000); break; } B.over = "loss"; B.log.push("You forfeited."); save(); render(); break;
+    case "b-forfeit": if (!el.dataset.sure) { el.dataset.sure = "1"; const lab = el.textContent; el.textContent = "Tap again to forfeit"; setTimeout(() => { el.dataset.sure = ""; el.textContent = lab; }, 3000); break; } B.over = "loss"; B.log.push("You forfeited."); save(); render(); break;
     case "b-undo": if (BUNDO.length) { let back = JSON.parse(BUNDO.pop()); while (BUNDO.length && npcAuto() && currentFighter(back) && currentFighter(back).side === "foe") back = JSON.parse(BUNDO.pop()); S.battle = back; UI.lastAttack = null; UI.lastFoe = null; save(); render(); } break;
     case "b-abandon": if (el.dataset.confirm) { S.battle = null; UI.lastAttack = null; commit("Battle closed without saving"); } else { el.dataset.confirm = "1"; el.textContent = "Tap again to close without saving"; } break;
     case "b-finish": battleFinish(el.dataset.res); break;
