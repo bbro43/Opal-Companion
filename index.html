@@ -9985,7 +9985,8 @@ function openPoi(n) {
 function openCenter(L) {
   musicPlace("center");
   const hurt = fitMons().some((m) => (m.hp != null && m.hp < monStats(m).hp) || m.status);
-  npcScene("Pokémon Center", "Nurse_FRLG_Custom_01", "Welcome to the Pokémon Center! May I heal your Pokémon?",
+  const low = isRanger() && stylerEnergy() < styler().energy; // a Ranger's Styler can be recharged here too
+  npcScene("Pokémon Center", "Nurse_FRLG_Custom_01", isRanger() ? "Welcome to the Pokémon Center! May I heal your Pokémon and recharge your Styler?" : "Welcome to the Pokémon Center! May I heal your Pokémon?",
     `<button class="btn primary" data-c="yes">Yes, please</button><button class="btn ghost" data-c="no">No, thanks</button>`, (el) => {
     el.addEventListener("click", (e) => {
       const b = e.target.closest("[data-c]"); if (!b) return;
@@ -9994,16 +9995,17 @@ function openCenter(L) {
       if (centersShut() && !isRanger()) { mafiaCenter(el); return; }
       if (false) { npcSay(el, "I'm so sorry… the Mafia cut off our supplies. We can't heal Pokémon until you earn your next Badge.", `<button class="btn" data-c="bye">OK</button>`); return; }
       if (S.evRun) { npcSay(el, "You're in the middle of an event. Finish its battles first, then come see me!", `<button class="btn" data-c="bye">OK</button>`); return; }
-      if (!hurt) { npcSay(el, "Your Pokémon look perfectly healthy already. We hope you excel!", `<button class="btn" data-c="bye">Bye!</button>`); return; }
+      if (!hurt && !low) { npcSay(el, isRanger() ? "Your Pokémon are healthy and your Styler is fully charged. We hope you excel!" : "Your Pokémon look perfectly healthy already. We hope you excel!", `<button class="btn" data-c="bye">Bye!</button>`); return; }
       npcSay(el, "Okay, I'll take your Pokémon for a few seconds. Just a minute…", "");
       $(".npc", el).classList.add("healing");
       musJingle("healing");
       setTimeout(() => {
         fitMons().forEach((m) => { m.hp = null; m.status = ""; });
-        log("note", `Healed the party at the ${S.loc} Pokémon Center.`); save(); render();
+        if (isRanger()) rgr().energy = styler().energy;
+        log("note", isRanger() ? `Healed up and recharged the Styler at the ${S.loc} Pokémon Center.` : `Healed the party at the ${S.loc} Pokémon Center.`); save(); render();
         if (!MODAL) return;
         $(".npc", el).classList.remove("healing");
-        npcSay(el, "Thank you for waiting. We've restored your Pokémon to full health. We hope you excel!", `<button class="btn primary" data-c="bye">Thanks, Nurse Joy!</button>`);
+        npcSay(el, isRanger() ? "Thank you for waiting. Your Pokémon are healthy and your Styler is fully recharged. We hope you excel!" : "Thank you for waiting. We've restored your Pokémon to full health. We hope you excel!", `<button class="btn primary" data-c="bye">Thanks, Nurse Joy!</button>`);
       }, 3200);
     });
   });
