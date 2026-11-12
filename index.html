@@ -5821,7 +5821,7 @@ function trainerAvail(L, t) {
 // find rewards in the event text: money, items, Pokémon
 function eventRewards(e) {
   const d = e.d || "";
-  const gifts = (EVENT_GIFTS[e.t] || []).map((v) => ({ k: "item", v, g: 0, s: "" }));
+  const gifts = (EVENT_GIFTS[e.t] || []).filter((v) => !(isRanger() && /Mega Bracelet|Z-Ring|Dynamax Band/.test(v))).map((v) => ({ k: "item", v, g: 0, s: "" }));
   const all = d.split(/(?<=[.!])\s+/);
   const out = [];
   const names = ITEMS.map((i) => i.name).sort((a, b) => b.length - a.length);
@@ -6896,7 +6896,7 @@ function evButtons(L, x) {
 
 /* ---------- Rangers don't do Trainer battles, Gyms, contests, the Conference or the Festival ---------- */
 function rangerOff(L, e, comp) {
-  return !!comp || /Contest|Grand Festival|Conference|Champions League|^Trainer Tower$|^The Hitmon Challenge$|Day Care$|Tutorial$|^Rival Battle/.test(e.t) || (!!L && typeof eventTrainers === "function" && eventTrainers(L, e).some(([t]) => /^Rival/.test(t.n)));
+  return !!comp || /Contest|Grand Festival|Conference|Champions League|^Trainer Tower$|^The Hitmon Challenge$|Day Care$|Tutorial$|^Rival Battle|Concert$/.test(e.t) || (!!L && typeof eventTrainers === "function" && eventTrainers(L, e).some(([t]) => /^Rival/.test(t.n)));
 }
 const rangerNoFight = (t, L) => (!!L && !/Mafia|Grunt|Admin|Boss/i.test(t.n) && typeof eventOfTrainer === "function" && !eventOfTrainer(L, t)) || /^(Gym Leader|Frontier Brain|Coordinator|Rival|Elite Four|Champion)/.test(t.n) || (!!t.rw && !/Mafia/i.test(t.n));
 
@@ -8195,7 +8195,7 @@ function procRunX(L, i, e, k, kind) {
     wxorb: () => weatherOrb(L, e, k),
     shinych: () => procPass(L, e, k, null, "Assistant Hazel gave you the Shiny Charm."),
     catchch: () => procPass(L, e, k, null, "Rory gave you the Catching Charm."),
-    bfree: () => procPass(L, e, k, null, "You watched the Metapod evolve in the moonlight. +2 to catch a Butterfree here."),
+    bfree: () => procPass(L, e, k, null, `You watched the Metapod evolve in the moonlight.${isRanger() ? "" : " +2 to catch a Butterfree here."}`),
     flower: () => flowerPower(L, e, k),
     ninetales: () => { if (!hasItem("Full Restore")) return toast("You need a Full Restore."); procPass(L, e, k, null, "You healed the Alolan Ninetales with a Full Restore."); },
     cavein: () => caveIn(L, e, k),
