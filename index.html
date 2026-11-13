@@ -1712,7 +1712,8 @@ function ballFriendship(name) { const it = itemFind(name); const m = it && it.de
 
 // a Pokémon over its Trainer's Obedience limit: −5 to attack and it loafs for 2 turns after each attack
 // Obedience checks the Pokémon's normal form: a Mega Evolution never pushes it over (or under) the limit
-const obedBst = (f) => (f.mega && f.bstPre != null ? f.bstPre : f.bst);
+// Obedience checks a gimmick by its base form: a Mega by its normal form, a Dynamax without its doubled HP
+const obedBst = (f) => (f.mega && f.bstPre != null ? f.bstPre : f.bst) - (f.dmax ? f.dmaxBst || 0 : 0);
 function overObedience(B, f) {
   const tr = trainerOf(B, f);
   return !!(tr && tr.hasTrainer && tr.bond == null && obedBst(f) > obedCap(tr.obedience));
@@ -6443,7 +6444,7 @@ function dynamax(B, c) {
 function obedNote(B, c) {
   const tr = trainerOf(B, c); if (!tr || !tr.hasTrainer || tr.bond != null) return;
   const lim = obedCap(tr.obedience);
-  if (!c.mega && c.bst > lim) B.log.push(`${c.name}'s Base Stat Total is now ${c.bst}, over ${tr.name || "its Trainer"}'s Obedience limit of ${lim}: −5 to its Attack Rolls and it loafs for 2 turns after each attack.`);
+  if (obedBst(c) > lim) B.log.push(`${c.name}'s Base Stat Total is now ${obedBst(c)}, over ${tr.name || "its Trainer"}'s Obedience limit of ${lim}: −5 to its Attack Rolls and it loafs for 2 turns after each attack.`);
 }
 // alternate forms the app swaps in by itself
 function setForm(f, row, why) {
@@ -6455,7 +6456,7 @@ function zenCheck(B, f) {
   // every Darmanitan switches at half HP: its Ability becomes Zen Mode then
   if (!/Darmanitan Standard Mode/.test(String(f.sp)) || f.zen || f.fainted || f.hp > f.maxHp / 2) return;
   const z = dexFind(String(f.sp).replace(/Standard Mode/, "Zen Mode")); if (!z || z.name === f.sp) return;
-  f.zen = true; f.preZenAbility = f.ability; f.ability = "Zen Mode"; if (/Standard Mode/.test(f.name)) f.name = f.name.replace(/Standard Mode/, "Zen Mode"); B.log.push(setForm(f, z, `${f.name} is at half HP or less: Zen Mode! It switched to its Zen Mode form.`)); obedNote(B, f);
+  f.zen = true; f.preZenAbility = f.ability; f.ability = "Zen Mode"; const nm0 = f.name; if (/Standard Mode/.test(f.name)) f.name = f.name.replace(/Standard Mode/, "Zen Mode"); B.log.push(setForm(f, z, `${nm0} is at half HP or less: Zen Mode! It switched to its Zen Mode form.`)); obedNote(B, f);
 }
 const CASTFORM = { Sunshine: "Castform Sunny Form", Rain: "Castform Rainy Form", Hail: "Castform Snowy Form", Snow: "Castform Snowy Form" };
 function formSync(B) {
