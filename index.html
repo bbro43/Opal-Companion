@@ -2513,7 +2513,7 @@ function ptsSub(kind, rest) { const n = awardPoints(kind); return n ? `${n} poin
 // the title your path was aiming for, once you've earned it
 // the Conference or Grand Festival was lost (one try): the next goal is Frontier Brain
 function goalMissed() { const T = S.titles || {}, k = pathKind(); if (T["Frontier Brain"]) return false; if (k === "gym") return !T.Champion && confDone(); if (k === "hall") { const L = LOCMAP.get("Melbouboro"), e = L && L.ev.find((x) => /Grand Festival/.test(x.t)); return !T["Top Coordinator"] && !!e && S.events[eventKey(L.n, e)] === "failed"; } return false; }
-function goalEarned() { const T = S.titles || {}, want = (PATHS[pathKind()] || [])[0]; if (want && T[want]) return want; if (T["Grand Champion"] && pathKind() === "gym") return "Grand Champion"; if (T["Frontier Brain"]) return "Frontier Brain"; return ""; }
+function goalEarned() { const T = S.titles || {}, want = (PATHS[pathKind()] || [])[0]; if (T["Grand Champion"] && pathKind() === "gym") return "Grand Champion"; if (want && T[want]) return want; if (T["Grand Champion"] && pathKind() === "gym") return "Grand Champion"; if (T["Frontier Brain"]) return "Frontier Brain"; return ""; }
 function trRow(L, t, i) {
   const evFailed = (() => { const e0 = typeof eventOfTrainer === "function" && eventOfTrainer(L, t); return !!(e0 && S.events[eventKey(L.n, e0)] === "failed" && !REPEATABLE.test(e0.t) && S.settings.view !== "gm"); })();
   const k = L.n + "|" + t.n + "|" + t.at, beat = S.beaten[k];
@@ -11525,7 +11525,7 @@ function newGameForm(fromDemo) {
 // one results screen for a Badge, Ribbon or Symbol win: what you earned, the prize, and Friendship; then the points screen
 function winSummary(w, next) {
   modal("Victory!", `<div class="row" style="gap:12px;align-items:center">${w.icon && typeof awardIcon === "function" ? awardIcon(w.icon) : ""}<div><b style="font-size:17px">${esc(w.head)}</b></div></div>
-    <div class="stack" style="margin-top:8px">${w.pr ? `<div>Prize money: <b>${money(w.pr)}</b></div>` : ""}${w.fr && w.fr.length ? `<div>Friendship +1: ${w.fr.map((m) => `${esc(monName(m))} (${m.fr})`).join(", ")}</div>` : ""}</div>
+    <div class="stack" style="margin-top:8px">${w.pr ? `<div>Prize money: <b>${money(w.pr)}</b></div>` : ""}${w.fr && w.fr.length ? `<div>Friendship +1: ${w.fr.map((m) => `${esc(monName(m))} (${m.fr >= 10 ? "10, maxed" : m.fr})`).join(", ")}</div>` : ""}</div>
     <button class="btn primary" data-ws>Continue</button>`, (el) => { MODAL.onClose = () => { if (next) next(); }; $("[data-ws]", el).addEventListener("click", () => { closeModal(); if (next) next(); }); });
 }
 function newGameStarter(info) {
