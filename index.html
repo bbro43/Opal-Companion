@@ -4045,7 +4045,7 @@ function confResolve() {
   for (;;) {
     const cur = C.rounds[C.rounds.length - 1];
     if (cur.some((x) => x == null)) return;
-    if (cur.length === 1) { C.done = true; if (!C.rounds[0].some((x) => x && x.me)) { log("event", `${cur[0].n} won the Endigio League Conference.`); return; } markTourEvent("Endigio League Conference", !!cur[0].me); if (cur[0].me) { S.titles = S.titles || {}; S.titles.Champion = true; log("title", "Won the Endigio League Conference and earned the title Champion!"); } else log("event", `${cur[0].n} won the Endigio League Conference.`); return; }
+    if (cur.length === 1) { C.done = true; if (!C.rounds[0].some((x) => x && x.me)) { log("event", `${cur[0].n} won the Endigio League Conference.`); return; } markTourEvent("Endigio League Conference", !!cur[0].me); if (cur[0].me) { S.titles = S.titles || {}; S.titles.Champion = true; log("title", "Won the Endigio League Conference and earned the title Champion!"); confFrScreen(); } else log("event", `${cur[0].n} won the Endigio League Conference.`); return; }
     C.res = C.res || {};
     const r = C.rounds.length - 1;
     const pairs = confPairs(cur);
@@ -4458,6 +4458,15 @@ function simTourMatch(ia, ib, n) {
 
 // Pokémon are healed for free before every round of the Conference, the Champions League and the Grand Festival
 function tourHeal() { const hurt = partyMons().some((m) => (m.hp != null) || m.status); partyMons().forEach((m) => { m.hp = null; m.status = ""; }); if (hurt) log("note", "Your Pokémon were healed before the next round."); }
+
+// the Conference's Friendship screen (like the Champions League's): +1 for the Pokémon you used, then the Champion celebration
+function confFrScreen() {
+  const L = LOCMAP.get("Endigio Town"), e = L && L.ev.find((x) => x.t === "Endigio League Conference"); if (!e) return;
+  const ids = (S.tour && S.tour.confUsed) || partyMons().filter((m) => !m.egg).map((m) => m.id);
+  S.confFrPending = true;
+  const go = () => { if ((typeof MODAL !== "undefined" && MODAL) || S.battle) return setTimeout(go, 400); S.confFrPending = false; openRewards(L, e, () => commit("Conference won"), ids.slice()); };
+  setTimeout(go, 300);
+}
 
 /* ============================================================
    Pokémon Ranger mode
@@ -11139,7 +11148,7 @@ setInterval(() => {
   if (typeof S === "undefined" || !S || S.demo || !S.trainer) return;
   const T = S.titles || {};
   if (!S.titlesSeen) { S.titlesSeen = Object.keys(T).filter((k) => T[k]); save(); return; } // older saves: no fireworks for titles already earned
-  if ((typeof MODAL !== "undefined" && MODAL) || S.battle || (typeof titleUp === "function" && titleUp()) || (typeof pendingAward === "function" && pendingAward())) return;
+  if ((typeof MODAL !== "undefined" && MODAL) || S.battle || (typeof titleUp === "function" && titleUp()) || S.confFrPending || (typeof pendingAward === "function" && pendingAward())) return;
   const t = Object.keys(T).find((k) => T[k] && !S.titlesSeen.includes(k)); if (!t) return;
   S.titlesSeen.push(t); save(); titleCelebrate(t);
 }, 600);
@@ -11153,6 +11162,11 @@ setInterval(() => {
     return live ? h.replace(/(<button class="btn sm primary" data-act="proc"[^>]*>)[^<]*(<\/button>)/, "$1Continue the event$2") : h;
   };
 }
+
+/* ---------- big screens (title celebrations, Victory!) cover the toast and the dice tray ---------- */
+function clearOverlays() { const t = document.getElementById("toast"); if (t) { t.classList.remove("show"); clearTimeout(t._h); } document.querySelectorAll(".dice-tray").forEach((x) => x.remove()); }
+{ const _tc = titleCelebrate; titleCelebrate = function (t) { clearOverlays(); return _tc(t); }; }
+{ const _ws = winSummary; winSummary = function (w, next) { clearOverlays(); return _ws(w, next); }; }
 
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
@@ -11324,6 +11338,8 @@ function performAttack(B, cur, tgt, attType, d20, dmg, z, npc) {
 }
 function battleFinish(res) {
   const B = S.battle; let winSum = null;
+  // remember who fought in the Conference, for its Friendship screen
+  if (B.tour && B.tour.kind === "conf" && S.tour) { const used = B.sides.me.mons.filter((f) => f.acted || f.fainted || f.entered).map((f) => f.monId).filter(Boolean); S.tour.confUsed = [...new Set([...(S.tour.confUsed || []), ...used])]; }
   if (B.kind === "wild") S.enc = null;
   researchBattle(B, res);
   rgBattleDone(B, res);
