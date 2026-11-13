@@ -13633,7 +13633,7 @@ function netHostRecv(c, m) {
     const o = decodeShare(m.share); if (!o) return;
     c.pid = o.pid; NET.conns[o.pid] = c;
     NET.roster[o.pid] = { n: o.n, on: true, at: Date.now(), bat: m.bat || null, feed: m.feed || [] };
-    hostMerge(o); addLinked(o); save();
+    const n0 = (S.log || []).length; hostMerge(o); addLinked(o); if (m.t === "upd" && S.log.length > n0 && /^(Updated|Linked with) /.test(S.log[S.log.length - 1].text)) S.log.pop(); save();
     if (m.t === "hello") { toast(`${o.n} joined the room`); log("note", `${o.n} joined live room ${NET.code}.`); }
     netGroupSoon(0); render(); return;
   }
@@ -13748,15 +13748,17 @@ function netPvpInvite(pid) {
 function netPvpRecv(from, m) {
   if (m.t === "pvp-inv") {
     if (S.battle) { netSend(from, { t: "pvp-no", why: "busy" }); return; }
-    modal(`${esc(m.n)} wants to battle`, `<div>${m.fmt === 2 ? "Double" : "Single"} Battle, ${m.indoor ? "indoors" : "outdoors"}. You pick your own attacks on this phone.</div><div class="row"><button class="btn primary" data-pa>Battle!</button><button class="btn ghost" data-pn>Not now</button></div>`, (el) => {
+    modal(m.contest ? `Contest Battle vs ${esc(m.n)}` : `${esc(m.n)} wants to battle`, `<div>${m.contest ? `You and ${esc(m.n)} made the Battle Round of the ${esc(m.contest)} Contest at ${esc(m.hall || "the Hall")}. Your ${esc(m.mon || "Pokémon")} battles their ${esc(m.foeMon || "Pokémon")}. Each Pokémon has 10 Contest Points.` : `${m.fmt === 2 ? "Double" : "Single"} Battle, ${m.indoor ? "indoors" : "outdoors"}.`} You pick your own attacks on this phone.</div><div class="row"><button class="btn primary" data-pa>Battle!</button><button class="btn ghost" data-pn>Not now</button></div>`, (el) => {
       $("[data-pa]", el).addEventListener("click", () => { closeModal(); NET.pvp = { opp: from, remote: true }; netSend(from, { t: "pvp-acc", share: encodeShare(Object.assign(shareObj(), { ts: Date.now() })) }); netPvpView(); });
-      $("[data-pn]", el).addEventListener("click", () => { closeModal(); netSend(from, { t: "pvp-no" }); });
-      MODAL.onClose = () => netSend(from, { t: "pvp-no" });
+      $("[data-pn]", el).addEventListener("click", () => { closeModal(); netSend(from, { t: "pvp-no", contest: !!m.contest }); });
+      MODAL.onClose = () => netSend(from, { t: "pvp-no", contest: !!m.contest });
     });
     return;
   }
+  if (m.t === "pvp-no" && S.battle && S.battle.netWait === from) { delete S.battle.netWait; S.battle.log.push(`${netName(from)} can't play live, so both sides are played on this phone.`); NET.pvp = null; save(); render(); toast(`${netName(from)} can't play live. Play both sides here.`); return; }
   if (m.t === "pvp-no") { if (NET.pvp && NET.pvp.opp === from) { NET.pvp = null; toast(m.why === "busy" ? `${netName(from)} is in a battle right now.` : `${netName(from)} said not now.`); } return; }
   if (m.t === "pvp-acc") {
+    if (S.battle && S.battle.netWait === from) { const B = S.battle; delete B.netWait; B.net = { opp: from, n: netName(from), contest: true }; B.log.push(`${netName(from)} picks their own attacks on their phone.`); NET.pvp = { opp: from }; save(); render(); netPvpPush(true); return; }
     const P = NET.pvp; if (!P || P.opp !== from || !P.wait) return;
     const g = decodeShare(m.share); if (!g) return; addLinked(g);
     P.wait = false;
@@ -13773,14 +13775,14 @@ function netPvpRecv(from, m) {
     save(); render(); netPvpPush(true); return;
   }
   if (m.t === "pvp-state") { NET.pvp = Object.assign(NET.pvp || { opp: from, remote: true }, { st: m.st }); netPvpView(); return; }
-  if (m.t === "pvp-end") { const won = m.res === "loss"; log("battle", `${won ? "Beat" : "Lost to"} ${netName(from)} in a live battle.`); NET.pvp = null; if (MODAL && MODAL.netPvp) closeModal(); modal(won ? "You won!" : "Battle over", `<div>${won ? `You beat ${esc(netName(from))}!` : `${esc(netName(from))} won this one.`}</div><button class="btn primary" data-act="modal-close">OK</button>`); save(); render(); return; }
+  if (m.t === "pvp-end") { const won = m.res === "loss"; if (!m.contest) log("battle", `${won ? "Beat" : "Lost to"} ${netName(from)} in a live battle.`); NET.pvp = null; if (MODAL && MODAL.netPvp) { MODAL.lock = null; closeModal(); } modal(won ? "You won!" : "Battle over", `<div>${won ? `You beat ${esc(netName(from))}!${m.contest ? " Your Ribbon arrives with the group update in a moment." : ""}` : `${esc(netName(from))} won this one.`}</div><button class="btn primary" data-act="modal-close">OK</button>`); save(); render(); return; }
   if (m.t === "pvp-quit") { if (S.battle && S.battle.net && S.battle.net.opp === from) { S.battle.log.push(`${netName(from)} left the battle.`); S.battle.over = "win"; netPvpEnd(S.battle, "win", true); save(); render(); } else if (NET.pvp && NET.pvp.remote) netPvpAbort("left"); }
 }
 // what the other phone needs to see and choose
 function netPvpSnap(B) {
-  const cur = currentFighter(B), side = (s) => B.sides[s].mons.map((f, i) => ({ k: f.key, n: f.name, sp: f.sp, hp: f.hp, max: f.maxHp, st: f.status || "", ty: fighterTypes(f), out: f.fainted, act: B.sides[s].active.includes(i), i }));
+  const cur = currentFighter(B), C = B.contest, side = (s) => B.sides[s].mons.map((f, i) => ({ k: f.key, n: f.name, sp: f.sp, hp: f.hp, max: f.maxHp, st: f.status || "", ty: fighterTypes(f), out: f.fainted, act: B.sides[s].active.includes(i), i, cp: C ? (C.each ? cpOf(C, f) : C.pts[s]) : null }));
   const mine = cur && cur.side === "foe" ? cur : null;
-  return { title: B.title, round: B.round, me: side("foe"), them: side("me"), turn: mine ? { k: mine.key, n: mine.name, ty: fighterTypes(mine), z: !!(mine.item && (itemFind(mine.item) || {}).cat === "Z-Crystal" && !mine.zUsed && !mine.itemGone) } : null, log: B.log.slice(-8), over: B.over || "", noSub: !!(B.rules && B.rules.noSub) };
+  return { title: B.title, contest: C ? C.type || "Frontier" : "", round: B.round, me: side("foe"), them: side("me"), turn: mine ? { k: mine.key, n: mine.name, ty: fighterTypes(mine), z: !!(mine.item && (itemFind(mine.item) || {}).cat === "Z-Crystal" && !mine.zUsed && !mine.itemGone) } : null, log: B.log.slice(-8), over: B.over || "", noSub: !!(B.rules && B.rules.noSub) };
 }
 function netPvpPush(force) {
   const B = S.battle; if (!B || !B.net) return;
@@ -13790,8 +13792,8 @@ function netPvpPush(force) {
 }
 function netPvpEnd(B, res, quiet) {
   if (!B || !B.net) return;
-  netSend(B.net.opp, { t: "pvp-end", res: res === "win" ? "win" : "loss" });
-  if (!quiet) log("battle", `${res === "win" ? "Beat" : "Lost to"} ${B.net.n} in a live battle.`);
+  netSend(B.net.opp, { t: "pvp-end", res: res === "win" ? "win" : "loss", contest: !!B.net.contest });
+  if (!quiet && !B.net.contest) log("battle", `${res === "win" ? "Beat" : "Lost to"} ${B.net.n} in a live battle.`);
   NET.pvp = null;
 }
 function netPvpAbort(why) { NET.pvp = null; if (MODAL && MODAL.netPvp) closeModal(); toast(why === "left" ? "The other player left the battle." : "Battle ended."); }
@@ -13799,19 +13801,19 @@ function netPvpAbort(why) { NET.pvp = null; if (MODAL && MODAL.netPvp) closeModa
 function netPvpView() {
   const P = NET.pvp; if (!P || !P.remote) return;
   const st = P.st, pick = { ty: "", tgt: "" };
-  const bar = (x) => `<div class="li" style="${x.out ? "opacity:.45" : ""}">${sprite(x.sp, "sm")}<div class="main"><div class="t">${esc(x.n)}${x.act ? ` <span class="pill accent">In battle</span>` : ""}${x.st ? ` <span class="pill warn">${esc(x.st)}</span>` : ""}</div><div class="hpbar"><i style="width:${Math.max(0, Math.round((100 * x.hp) / Math.max(1, x.max)))}%"></i></div><div class="tiny muted">HP ${x.hp}/${x.max}${x.out ? " · fainted" : ""}</div></div></div>`;
-  const body = () => !st ? `<div class="muted">Waiting for the battle to start…</div>` : `<div class="tiny muted">Round ${st.round}</div>
+  const bar = (x) => `<div class="li" style="${x.out ? "opacity:.45" : ""}">${sprite(x.sp, "sm")}<div class="main"><div class="t">${esc(x.n)}${x.act ? ` <span class="pill accent">In battle</span>` : ""}${x.st ? ` <span class="pill warn">${esc(x.st)}</span>` : ""}</div><div class="hpbar"><i style="width:${Math.max(0, Math.round((100 * x.hp) / Math.max(1, x.max)))}%"></i></div><div class="tiny muted">HP ${x.hp}/${x.max}${x.cp != null ? ` · <b>${x.cp} Contest Point${x.cp === 1 ? "" : "s"}</b>` : ""}${x.out ? " · out" : ""}</div></div></div>`;
+  const body = () => !st ? `<div class="muted">Waiting for the battle to start…</div>` : `<div class="tiny muted">${st.contest ? esc(st.contest) + " Contest Battle · " : ""}Round ${st.round}</div>
     <b>${esc(netName(P.opp))}</b><div class="stack">${st.them.filter((x) => x.act).map(bar).join("")}</div>
     <b>You</b><div class="stack">${st.me.filter((x) => x.act).map(bar).join("")}</div>
     ${st.turn ? `<div class="reminder"><b>${esc(st.turn.n)}'s turn.</b> Pick an attack type${st.them.filter((x) => x.act && !x.out).length > 1 ? " and a target" : ""}.</div>
       <div class="row">${st.turn.ty.map((t) => `<button class="btn ${pick.ty === t ? "primary" : ""}" data-np-ty="${t}">${typeChip(t)}</button>`).join("")}</div>
       ${st.them.filter((x) => x.act && !x.out).length > 1 ? `<div class="row">${st.them.filter((x) => x.act && !x.out).map((x) => `<button class="btn sm ${pick.tgt === x.k ? "primary" : ""}" data-np-tg="${x.k}">${esc(x.n)}</button>`).join("")}</div>` : ""}
       ${st.turn.z ? `<label class="check"><input type="checkbox" id="np-z"> Z-Move (+3, once)</label>` : ""}
-      <div class="row"><button class="btn primary" data-np-atk>Attack</button>${st.noSub ? "" : `<button class="btn" data-np-sw>Switch</button>`}</div>` : st.over ? "" : `<div class="muted small">${esc(netName(P.opp))} is choosing…</div>`}
+      <div class="row"><button class="btn primary" data-np-atk>Attack</button>${st.noSub || st.contest || !st.me.some((x) => !x.act && !x.out) ? "" : `<button class="btn" data-np-sw>Switch</button>`}</div>` : st.over ? "" : `<div class="muted small">${esc(netName(P.opp))} is choosing…</div>`}
     <div class="log tiny">${st.log.map((l) => `<div>${esc(l)}</div>`).join("")}</div>
     <button class="btn ghost danger sm" data-np-quit>Leave the battle</button>`;
   const draw = (el) => { el.innerHTML = body(); };
-  modal(`Live battle vs ${netName(P.opp)}`, body(), (el) => {
+  modal(`${st && st.contest ? "Contest Battle" : "Live battle"} vs ${netName(P.opp)}`, body(), (el) => {
     MODAL.netPvp = true; MODAL.lock = "Use Leave the battle to stop.";
     el.addEventListener("click", (e) => {
       const ty = e.target.closest("[data-np-ty]"), tg = e.target.closest("[data-np-tg]");
@@ -13936,6 +13938,26 @@ document.addEventListener("click", (e) => {
     clearInterval(t); netResume();
   }, 800);
 })();
+
+{ const _scb = startContestBattle; startContestBattle = function (...a) {
+  const C = UI.contest, info = C ? appealRows(C) : null;
+  const r = _scb.apply(this, a); const B = S.battle;
+  if (B && B.contestFoePl && netOnline(B.contestFoePl) && !B.net) {
+    const foe = info && info.rows.find((x) => x.pl === B.contestFoePl), hall = HALLS.find((h) => h.id === (B.contest || {}).hall);
+    B.netWait = B.contestFoePl; B.log.push(`Waiting for ${netName(B.contestFoePl)} to join the Contest Battle on their phone…`);
+    netSend(B.contestFoePl, { t: "pvp-inv", contest: B.contest.type, hall: hall ? hall.town : S.loc, n: S.trainer.name || "Trainer", mon: foe ? foe.mon : "", foeMon: info && info.m ? monName(info.m) : "" });
+    save(); render();
+  }
+  return r;
+}; }
+// while waiting for the other phone to join, their side isn't playable here either
+document.addEventListener("click", (e) => {
+  const B = S && S.battle; if (!B || !B.netWait) return;
+  const t = e.target.closest('[data-act="attack"],[data-act="skip"],[data-act="swap"],[data-act="b-item"],[data-bv]'); if (!t || t.dataset.bv === "close") return;
+  e.stopPropagation(); e.preventDefault(); toast(`Waiting for ${netName(B.netWait)} to join on their phone.`);
+}, true);
+// the other player's Pokémon never runs on autopilot here
+{ const _ftr = foeTurnReady; foeTurnReady = function (B) { if (B && (B.net || B.netWait)) return null; return _ftr.apply(this, arguments); }; }
 
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
