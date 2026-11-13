@@ -2697,7 +2697,9 @@ function startTrainerBattle(locName, i, o2) {
       const allySp = heist ? "jayden" : ally ? (nido || (reef ? "Manaphy" : /alongside Meowstic/i.test(evd) ? "Meowstic ♂" : "Lucario")) : "";
       const allyF = () => { if (heist) return jaydenAllies(); const d = dexFind(allySp); return d ? [makeFighter({ name: d.name, sp: d.name, types: d.types, hp: d.hp, atk: d.atk, def: d.def, spd: d.spd, abilities: [d.ab1, d.ab2].filter(Boolean), ability: d.ab1 }, "me")] : []; };
       const ftr = boss ? null : { hasTrainer: true, name: t.n, ...trainerStats(L, t) };
-      const odds = (tm) => simFight(() => (ally ? allyF() : []).concat(tm.map(fighterFromMon)), () => rows.map((r) => fighterFromRow(r, "foe")), (dbl0 || ally) && rows.length > 1 ? 2 : 1, 100, ftr);
+      const oFv = isBrain && L.ev.find((e) => /^The Battle \w+$/.test(e.t)), oFR = (oFv && FRONTIER_RULES[oFv.t]) || null;
+      const oFmt = oFR ? ((o2 && o2.format) || oFR.format || 1) : (dbl0 || ally) && rows.length > 1 ? 2 : 1;
+      const odds = (tm) => simFight(() => (ally ? allyF() : []).concat(tm.map(fighterFromMon)), () => rows.map((r) => fighterFromRow(r, "foe")), oFmt, 100, ftr, { kind: boss ? "boss" : "trainer", isGym, isBrain, eventName: t.e, loc: L.n, rules: oFR, indoor: isGym || (isBrain && !/Battle Forest/.test(t.at) && L.n !== "Battle Forest") || /Contest Hall|Gym|Tower|Inside|Lab|Store|Museum/i.test(t.at) || !L.w });
       return teamPick({ n, odds, always: isGym, title: `${t.n}: choose your team`, why: isGym ? `Gym Battles are ${four ? `${n}v${n} Double Battles` : "3v3"}. Only you can substitute.${((S.gymTries || {})[L.n] || {}).losses ? (" " + wonderGuardWarning(rows, fitMons()) + " This is your last try here before you must challenge a different Gym.") : ""}` : heist ? `A Double Battle alongside Rival Jayden (${jaydenAllies().map((f) => esc(f.sp)).join(" and ")}). Pick 2 Pokémon: you each send one out at a time.` : ally ? `You battle alongside ${nido ? "the Nidoran you helped, now a Nidoking" : reef ? "Manaphy" : /alongside Meowstic/i.test(evd) ? "Meowstic" : isRanger() ? "a fellow Ranger's Lucario" : "a Ranger's Lucario"}. Pick one Pokémon to join it.` : evN ? `This is a ${evN} on ${evN} battle.` : /Mafia/i.test(t.n) ? "The Mafia doesn't fight fair: bring your whole party. The first one leads." : `Match their team: ${Math.min(6, rows.length)} on ${Math.min(6, rows.length)}. ${(o2 && o2.format === 2) || (FRONTIER_RULES[t.at] || {}).format === 2 ? "The first two lead (Double Battle)." : "The first one leads."}`, always: true }, (team) => startTrainerBattle(locName, i, { ...(o2 || {}), team, ally: ally ? allySp : "" }));
     }
   }
@@ -4100,7 +4102,7 @@ function tourBattle(L, i, rows, tour, title, extra, team) {
   if (!team && !(extra && extra.meMons)) { const n = Math.min(6, rows.length), conf = tour && tour.kind === "conf";
     const ftr = { hasTrainer: true, name: t.n, obedience: t.o, intuition: t.i, will: t.wl, execution: t.x || 0 };
     const pickRows = () => n >= t.m.length || !conf ? rows : t.m.slice().sort(() => Math.random() - 0.5).slice(0, n);
-    return teamPick({ n, title: `${title}: choose your team`, box: conf, odds: (tm) => simFight(() => tm.map(fighterFromMon), () => pickRows().map((r) => fighterFromRow(r, "foe")), 1, 100, ftr),
+    return teamPick({ n, title: `${title}: choose your team`, box: conf, odds: (tm) => simFight(() => tm.map(fighterFromMon), () => pickRows().map((r) => fighterFromRow(r, "foe")), 1, 100, ftr, { kind: "trainer", loc: L.n }),
       why: (n < 6 ? `This round is ${n}v${n}, with the same rules as a Gym Battle.` : "This is a full 6v6 battle. Pick your order.") + (conf ? ` This is your only try. ${n < t.m.length ? `${t.n}'s ${n} Pokémon are picked at random from their team of ${t.m.length}. ` : ""}You can swap Pokémon in from your Box first.` : ""), always: true }, (tm) => tourBattle(L, i, rows, tour, title, extra, tm)); }
   newBattle(Object.assign({ kind: "trainer", title, loc: L.n, trKey: L.n + "|" + t.n + "|" + t.at, trIdx: i, reward: t.rw, indoor: true, format: 1,
     foeTrainer: { hasTrainer: true, name: t.n, obedience: t.o, intuition: t.i, will: t.wl, execution: t.x || 0 }, foeMons: rows.map((r) => fighterFromRow(r, "foe")), meMons: team }, extra || {}));
@@ -11180,6 +11182,59 @@ function clearOverlays() { const t = document.getElementById("toast"); if (t) { 
 
 // the older "New title!" pop-up is replaced by the celebration screen: clear its queue so a title isn't announced twice
 { const _snt = showNewTitle; showNewTitle = function () { if (S && S.titleNew) { S.titleNew = []; save(); } }; }
+
+/* ================= Odds sim: the same battle the app plays =================
+   Both sides run through the real battle code: held items, Abilities, Trainer stats (Obedience, Intuition, Will, Execution),
+   facility rules (Battle Station items off, Battle Forest points, no-sub), Battle Hall Contest Points, the Brains' Full Restore,
+   and gimmicks: the opponent uses Mega, Z-Moves and Dynamax the way it does in play; you use yours the way a sharp player would. */
+function simMeGimmick(B, cur) {
+  const RU = B.rules || {}, g = B.gimmick.me;
+  if (!g && !cur.mega && !cur.dmax && !RU.noHeld && hasGear("mega") && canMega(cur)) { megaEvolve(B, cur); return false; }
+  // Dynamax your strongest Pokémon still standing (or the last one), once
+  if (!g && !cur.mega && !cur.dmax && hasGear("dmax")) {
+    const alive = B.sides.me.mons.filter((f) => !f.fainted), top = alive.slice().sort((a, b) => b.bst - a.bst)[0];
+    if (top === cur || alive.length === 1) { dynamax(B, cur); return false; }
+  }
+  // a Z-Move on the first attack of a Pokémon holding a matching Z-Crystal
+  const it = itemFind(cur.item) || {}, zt = it.cat === "Z-Crystal" && ((it.desc || "").match(/an? (\w+)-type/) || [])[1];
+  if (zt && hasGear("z") && !cur.itemGone && !cur.zUsed && (!g || g === "Z-Move") && ((B.zCount || {}).me || 0) < 3 && isType(cur, zt.toUpperCase())) return zt.toUpperCase();
+  return false;
+}
+function simFight(me, foe, fmt, n, ftr, opts) {
+  const o = opts || {}, Lc = LOCMAP.get(o.loc || S.loc) || {};
+  const indoor = o.indoor != null ? o.indoor : true;
+  const manual = S.settings.npcManual; S.settings.npcManual = false;
+  let w = 0;
+  try {
+    for (let k = 0; k < n; k++) {
+      const a = me(), b = foe(); a.forEach((f) => (f.side = "me")); b.forEach((f) => (f.side = "foe"));
+      const wb = indoor ? "Normal" : Lc.w || "Normal", tb = indoor ? "Normal" : Lc.t || "Normal";
+      const B = { sim: true, kind: o.kind || "boss", title: "sim", loc: o.loc || S.loc, isGym: !!o.isGym, isBrain: !!o.isBrain, eventName: o.eventName || "",
+        sides: { me: { trainer: myTrainer(), mons: a, active: a.slice(0, fmt).map((_, i) => i) }, foe: { trainer: ftr || { hasTrainer: false, name: "x", obedience: 0, intuition: 0, will: 0 }, mons: b, active: b.slice(0, fmt).map((_, i) => i) } },
+        weather: wb, terrain: tb, weatherBase: wb, terrainBase: tb, indoor, weatherTurns: 0, terrainTurns: 0, format: fmt, round: 1, ptr: 0,
+        gimmick: { me: "", foe: "" }, log: [], over: "", rules: o.rules || null,
+        contest: o.rules && o.rules.contest ? { type: "Frontier", each: true, cp: {}, pts: { me: 10, foe: 10 }, turns: { me: 0, foe: 0 }, hall: "" } : null };
+      if (o.rules && o.rules.noHeld) [a, b].forEach((s) => s.forEach((f) => { if (f.item) { f.itemGone = true; f.itemOff = true; } }));
+      try {
+        allActive(B).forEach((f) => onEnter(B, f));
+        if (typeof formSync === "function") formSync(B);
+        for (let g = 0; g < 3000; g++) {
+          if (B.over || ["me", "foe"].some((s) => B.sides[s].mons.every((f) => f.fainted))) break;
+          const cur = currentFighter(B); if (!cur) { advanceTurn(B, null); continue; }
+          if (cur.side === "foe" && foeStep(B)) continue;
+          const z = cur.side === "me" ? simMeGimmick(B, cur) : false;
+          const ch = npcChoice(B, cur, cur.side === "me" ? 9 : null); if (!ch) { advanceTurn(B, cur); continue; }
+          if (z) ch.ty = z;
+          performAttack(B, cur, ch.t, ch.ty, null, null, !!z, true);
+        }
+      } catch (e) { continue; }
+      const left = (s) => B.sides[s].mons.reduce((t, f) => t + (f.fainted ? 0 : f.hp / f.maxHp), 0);
+      if (B.over === "win" || (!B.over && B.sides.foe.mons.every((f) => f.fainted))) w++;
+      else if (!B.over && !B.sides.me.mons.every((f) => f.fainted) && left("me") > left("foe")) w++;
+    }
+  } finally { S.settings.npcManual = manual; }
+  return w / n;
+}
 
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
