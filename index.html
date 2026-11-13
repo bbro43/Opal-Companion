@@ -13992,12 +13992,221 @@ function netRunContest(from, m) {
   newBattle({ kind: "contest", title: `${m.type} Contest vs ${g.n}`, indoor: true, format: 1, meMons: [mine], reward: "", foeTrainer: linkedTrainer(g), foeMons: [linkedFighter(p, "foe")],
     contest: { type: m.type, pts: { me: scarf ? 12 : 10, foe: 10 }, turns: { me: 0, foe: 0 }, hall: m.hall, scarf } });
   const B = S.battle; if (!B) return;
-  B.contestFoePl = m.vs; B.netWait = m.vs;
+  B.contestFoePl = m.vs; B.netWait = m.vs; if (m.town) B.loc = m.town;
   B.netInv = { t: "pvp-inv", contest: m.type, hall: m.town, n: S.trainer.name || "Trainer", mon: p.n, foeMon: monName(mine) };
   B.log.push(`${netName(from)} sent this Contest Battle. Waiting for ${g.n} to join on their phone…`);
   netAsk(B); save(); render();
 }
 { const _nh = netHandle; netHandle = function (from, msg) { if (msg && msg.t === "ct-run") { netRunContest(from, msg); return; } return _nh.apply(this, arguments); }; }
+
+/* ================= Group events in a live room: everyone in the same contest or tournament =================
+   Contests: the host opens a contest to the room. Every player picks their own Pokémon on their own phone, the
+   Appeal Round is scored once with everyone's picks, and each Battle Round pair plays live on the players' phones.
+   Conference and Grand Festival: a match between two players is played live, each player choosing their own team
+   and attacks; nobody plays someone else's side. */
+const gcOn = () => typeof NET !== "undefined" && !!NET.role;
+
+/* ---------- contests ---------- */
+// a player's own pick (made on their phone) replaces the guess from their shared party
+{ const _ar = appealRows; appealRows = function (C) {
+  const out = _ar.apply(this, arguments); if (!C || !C.picks) return out;
+  out.rows.forEach((r) => { const pk = r.pl && C.picks[r.pl]; if (pk && pk.p) Object.assign(r, { mon: pk.p.n, sp: pk.p.sp, shiny: pk.p.sh, v: pk.v, p: pk.p }); });
+  out.rows.sort((a, b) => b.v - a.v || (b.ro || 0) - (a.ro || 0));
+  return out;
+}; }
+const gcPending = (C) => (C && C.players || []).filter((pid) => netOnline(pid) && !(C.picks && C.picks[pid]));
+function gcInvite(pid) {
+  const C = UI.contest; if (!C || !netOnline(pid)) return;
+  const hall = HALLS.find((h) => h.town === S.loc); if (!hall) return;
+  C.picks = C.picks || {}; delete C.picks[pid];
+  netSend(pid, { t: "gc-open", type: C.type, hall: hall.id, town: hall.town, n: S.trainer.name || "Trainer" });
+}
+function gcInviteAll() {
+  const C = UI.contest; if (!C) return;
+  const on = linked().filter((g) => !g.ranger && netOnline(g.pid)).map((g) => g.pid).slice(0, 3);
+  if (!on.length) { toast("No one else in the room is connected."); return; }
+  C.players = on; C.ro = {}; C.picks = {}; on.forEach(gcInvite); toast(`Sent the ${C.type} Contest to ${on.map(netName).join(", ")}`); render();
+}
+// an invited player changes the contest type? the host re-sends when the type changes
+document.addEventListener("change", (e) => {
+  const el = e.target; if (!gcOn() || !UI.contest) return;
+  if (el.dataset && el.dataset.change === "ct-pl" && el.checked && netOnline(el.value)) setTimeout(() => gcInvite(el.value), 0);
+  if (el.dataset && el.dataset.change === "ct-type") setTimeout(() => { const C = UI.contest; if (C && C.players) C.players.filter(netOnline).forEach(gcInvite); }, 0);
+});
+// lock-in waits for every connected player to pick
+document.addEventListener("click", (e) => {
+  const t = e.target.closest('[data-act="ct-pick"]'); if (!t || !gcOn()) return;
+  const p = gcPending(UI.contest); if (p.length) { e.stopPropagation(); e.preventDefault(); toast(`Waiting for ${p.map(netName).join(" and ")} to pick their Pokémon.`); }
+}, true);
+// once the Battle Round starts (or the contest is logged), everyone who entered hears how it went
+document.addEventListener("click", (e) => {
+  const t = e.target.closest('[data-act="ct-start"],[data-act="ct-net"],[data-act="ct-lost"],[data-act="gc-npc"]'); if (!t || !gcOn()) return;
+  const C = UI.contest; if (!C || !(C.players || []).length) return;
+  const { rows } = appealRows(C), top = rows.slice(0, 2), hall = HALLS.find((h) => h.town === S.loc);
+  const table = rows.map((r) => ({ n: r.name, mon: r.mon, v: r.v, pl: r.pl || (r.me ? myPid() : "") }));
+  C.players.filter(netOnline).forEach((pid) => netSend(pid, { t: "gc-result", type: C.type, hall: hall && hall.id, town: S.loc, made: top.some((r) => r.pl === pid), top: top.map((r) => r.name), table }));
+}, true);
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-act='gc-all'],[data-act='gc-npc']"); if (!t) return;
+  if (t.dataset.act === "gc-all") gcInviteAll();
+  if (t.dataset.act === "gc-npc") gcSendNpc(t.dataset.pid);
+});
+// a player and a computer coordinator made the Battle Round: it plays on that player's phone
+function gcSendNpc(pid) {
+  const C = UI.contest; if (!C) return;
+  const { rows } = appealRows(C), top = rows.slice(0, 2), npc = top.find((r) => !r.pl && !r.me), pl = top.find((r) => r.pl === pid); if (!npc || !pl) return;
+  const hall = HALLS.find((h) => h.town === S.loc);
+  if (!netSend(pid, { t: "gc-npc", type: C.type, hall: hall.id, town: hall.town, num: npc.num, row: npc.row, mon: pl.mon })) { toast(`${netName(pid)} isn't connected.`); return; }
+  UI.contest = null; ctDrawUsed(S.loc); log("event", `${pl.name} plays their ${C.type} Contest Battle against ${npc.name} on their own phone.`); commit(`Sent to ${pl.name}`);
+}
+{ const _vcs = vContestSetup; vContestSetup = function (...a) {
+  let html = _vcs.apply(this, a); const C = UI.contest; if (!gcOn() || !C) return html;
+  const online = linked().filter((g) => !g.ranger && netOnline(g.pid));
+  let box = "";
+  if (online.length && !C.picked) box += `<div class="reminder"><b>Live room:</b> open this contest to everyone connected. Each player picks their own Pokémon on their phone.<div class="row"><button class="btn sm primary" data-act="gc-all">Open to the group (${online.length})</button></div></div>`;
+  const st = (C.players || []).map((pid) => { const pk = C.picks && C.picks[pid]; return pk ? `${esc(netName(pid))}: <b>${esc(pk.p.n)}</b> (Appeal ${pk.v})` : netOnline(pid) ? `${esc(netName(pid))}: <i>picking…</i>` : `${esc(netName(pid))}: shared party (not connected)`; });
+  if (st.length) box += `<div class="small">${st.join(" · ")}</div>`;
+  // a player vs a computer coordinator in the Battle Round
+  if (C.picked) { const { rows } = appealRows(C), top = rows.slice(0, 2), pl = top.find((r) => r.pl), npc = top.find((r) => !r.pl && !r.me);
+    if (pl && npc && !top.some((r) => r.me)) box += `<div class="row"><button class="btn sm primary" data-act="gc-npc" data-pid="${esc(pl.pl)}">Send ${esc(pl.name)}'s Contest Battle to their phone</button></div>`; }
+  return box ? html.replace(/(<div class="card-h"><h2>Contest<\/h2>.*?<\/div>)/, `$1${box}`) : html;
+}; }
+// on the invited player's phone
+function gcOpen(from, m) {
+  const ok = fitMons().filter((p) => (p.hp == null || p.hp > 0) && !p.egg);
+  const h = HALLS.find((x) => x.id === m.hall), won = h && (S.awards[h.id] || {}).on && !hallRepeatOK(h), locked = h && !won && hallLocked(h.id);
+  modal(`${esc(m.type)} Contest at ${esc(m.town)}`, `<div>${esc(m.n)} opened a ${esc(m.type)} Contest to the group. Pick the Pokémon you'll enter.</div>
+    ${won ? `<div class="reminder">You already have a Ribbon from this Hall, so you can't win another one here yet. You can still enter for fun.</div>` : locked ? `<div class="reminder">This Hall is closed to you after your last loss. You can still enter, but it won't count for a Ribbon.</div>` : ""}
+    <div class="stack">${ok.map((p) => { const a = myAppeal(p, m.type); return `<button class="btn" data-gc-m="${p.id}" style="justify-content:space-between">${sprite(p.sp, "xs", p.shiny)} ${esc(monName(p))}<span class="pill">Appeal ${a ? a.v : 0}</span></button>`; }).join("") || `<div class="empty">No healthy Pokémon to enter.</div>`}</div>
+    <button class="btn ghost" data-gc-out>Sit this one out</button>`, (el) => el.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-gc-m]");
+    if (b) { const p = S.mons.find((x) => x.id === b.dataset.gcM), a = myAppeal(p, m.type), sh = shareObj().party.find((x) => x.n === monName(p)); if (!sh) { toast("Put that Pokémon in your party first."); return; }
+      netSend(from, { t: "gc-pick", type: m.type, v: a ? a.v : 0, p: sh }); S.gcIn = { hall: m.hall, town: m.town, type: m.type, mon: p.id }; save(); closeModal(); toast(`Entered ${monName(p)}. Waiting for the Appeal Round.`); }
+    if (e.target.closest("[data-gc-out]")) { netSend(from, { t: "gc-pick", out: true }); closeModal(); }
+  }));
+}
+function gcPick(from, m) {
+  const C = UI.contest; if (!C || !(C.players || []).includes(from)) return;
+  if (m.out) { C.players = C.players.filter((x) => x !== from); if (C.picks) delete C.picks[from]; C.ro = {}; toast(`${netName(from)} is sitting this one out.`); render(); return; }
+  if (m.type !== C.type) return;
+  C.picks = C.picks || {}; C.picks[from] = { v: m.v, p: m.p }; C.ro = {}; toast(`${netName(from)} entered ${m.p.n}.`); render();
+}
+function gcResult(from, m) {
+  const tbl = `<table class="t appeal"><tbody>${m.table.map((r, i) => `<tr class="${i < 2 ? "ap-top" : ""}"><td>${i + 1}</td><td class="${r.pl === myPid() ? "me" : ""}">${esc(r.n)}</td><td>${esc(r.mon)}</td><td class="n">${r.v}</td></tr>`).join("")}</tbody></table>`;
+  if (!m.made) {
+    const h = HALLS.find((x) => x.id === m.hall); if (h) setLastHall(h.id);
+    S.contestsEntered = (S.contestsEntered || 0) + 1; delete S.gcIn;
+    log("event", `Entered the ${m.type} Contest at ${m.town} with the group but didn't make the Battle Round.`); save(); render();
+  }
+  modal(`${esc(m.type)} Contest: Appeal Round`, `${tbl}<div>${m.made ? `<b>You made the Battle Round!</b> Your Contest Battle comes to this phone next.` : `${esc(m.top.join(" and "))} go to the Battle Round.`}</div><button class="btn primary" data-act="modal-close">OK</button>`);
+}
+// a Battle Round against a computer coordinator, played on this phone
+function gcNpc(from, m) {
+  if (S.battle) { toast("Finish your current battle first, then ask the host to send the Contest Battle again."); return; }
+  const c = CONTESTANTS.find((x) => x.num === m.num), mine = S.mons.find((x) => monName(x) === m.mon) || (S.gcIn && S.mons.find((x) => x.id === S.gcIn.mon));
+  if (!c || !mine || !m.row) return;
+  const t = c.t, scarf = mine.item === "Black Scarf";
+  S.contestsEntered = (S.contestsEntered || 0) + 1; delete S.gcIn;
+  newBattle({ kind: "contest", title: `${m.type} Contest vs ${t.n}`, indoor: true, format: 1, meMons: [mine], reward: "",
+    foeTrainer: { hasTrainer: true, name: t.n, obedience: t.o, intuition: 0, will: 0, execution: t.x },
+    foeMons: [withCond(fighterFromRow(m.row, "foe"), c, m.row, m.type)], contest: { type: m.type, pts: { me: scarf ? 12 : 10, foe: 10 }, turns: { me: 0, foe: 0 }, hall: m.hall, scarf } });
+  if (S.battle) { if (m.town) S.battle.loc = m.town; S.battle.log.push(`${netName(from)} sent this Contest Battle from the group contest.`); save(); render(); }
+}
+
+/* ---------- Conference and Grand Festival: matches between two players are played live ---------- */
+const TR_NAMES = ["Round of 16", "Quarterfinal", "Semifinal", "Final"];
+function trMatch(kind) {
+  const T = S.tour && S.tour[kind]; if (!T || T.done) return null;
+  if (kind === "conf") return confMyMatch();
+  const r = T.rounds.length - 1, cur = T.rounds[r], k = cur.findIndex((x) => x && x.me); if (k < 0) return null;
+  if (T.res && T.res[r + ":" + Math.floor(k / 2)] != null) return null;
+  return { r, pk: Math.floor(k / 2), opp: cur[Math.floor(k / 2) * 2 + (k % 2 ? 0 : 1)], mine: k % 2, final: cur.length === 2 };
+}
+function trTitle(kind, mm) { return kind === "conf" ? `${TR_NAMES[mm.r]} vs ${netName(mm.opp.pl)}` : `Grand Festival ${mm.r ? "Final" : "Semifinal"} vs ${netName(mm.opp.pl)}`; }
+function trLive(kind) {
+  const mm = trMatch(kind); if (!mm || !mm.opp || !mm.opp.pl || !gcOn()) return false;
+  const pid = mm.opp.pl;
+  // the player listed first runs the match; the other one gets the invite
+  if (mm.mine === 1) { netSend(pid, { t: "tour-ready", kind }); toast(`${netName(pid)} starts this match. Their invite comes to this phone.`); return true; }
+  if (!netOnline(pid)) { toast(`${netName(pid)} isn't connected. The match waits until they are.`); return true; }
+  const go = (team) => {
+    NET.pvp = { opp: pid, wait: true, tour: kind, mm, team: (team || []).map((m) => m.id) };
+    netSend(pid, { t: "pvp-inv", tour: kind, title: trTitle(kind, mm).replace(/vs .*$/, `vs ${S.trainer.name || "Trainer"}`), n: S.trainer.name || "Trainer", size: kind === "conf" ? (mm.final ? 6 : 3) : 1 });
+    toast(`Invite sent to ${netName(pid)}`);
+  };
+  if (kind === "conf") { tourHeal(); const n = mm.final ? 6 : 3; teamPick({ n, title: `${trTitle(kind, mm)}: choose your team`, box: true, why: n < 6 ? "This round is 3v3. Then the other player picks theirs on their phone." : "A full 6v6. Then the other player picks theirs on their phone.", always: true }, go); }
+  else go([]);
+  return true;
+}
+{ const _cb = confBattle; confBattle = function (...a) { if (trLive("conf")) return; return _cb.apply(this, a); }; }
+{ const _gb = gfBattle; gfBattle = function (...a) { if (trLive("gf")) return; return _gb.apply(this, a); }; }
+// the invited player picks their own team, then the match starts on the other phone
+function trAccept(from, m) {
+  if (m.tour === "conf") {
+    tourHeal();
+    teamPick({ n: m.size, title: `${m.title}: choose your team`, box: true, why: "Pick your order. The battle runs on the other player's phone; you choose your own attacks here.", always: true }, (tm) => {
+      const all = shareObj().party, party = tm.map((x) => all.find((p) => p.n === monName(x))).filter(Boolean);
+      NET.pvp = { opp: from, remote: true }; netSend(from, { t: "pvp-acc", share: encodeShare(Object.assign(shareObj(), { party, ts: Date.now() })) }); netPvpView();
+    });
+    return;
+  }
+  const G = S.tour && S.tour.gf, mon = G && S.mons.find((x) => x.id === G.mon), p = mon && shareObj().party.find((x) => x.n === monName(mon));
+  if (!p) { toast("Your Grand Festival Pokémon needs to be in your party."); netSend(from, { t: "pvp-no" }); return; }
+  NET.pvp = { opp: from, remote: true }; netSend(from, { t: "pvp-acc", share: encodeShare(Object.assign(shareObj(), { party: [p], ts: Date.now() })) }); netPvpView();
+}
+function trStart(from, g) {
+  const P = NET.pvp, mm = P.mm; P.wait = false;
+  if (P.tour === "conf") {
+    const team = P.team.map((id) => S.mons.find((x) => x.id === id)).filter(Boolean);
+    newBattle({ kind: "pvp", title: trTitle("conf", mm), indoor: true, format: 1, foeTrainer: linkedTrainer(g), foeMons: g.party.map((p) => linkedFighter(p, "foe")), meMons: team });
+    if (S.battle) S.battle.tour = { kind: "conf", r: mm.r, pk: mm.pk, mine: mm.mine };
+  } else {
+    const G = S.tour.gf, m = S.mons.find((x) => x.id === G.mon); if (!m) return;
+    newBattle({ kind: "contest", title: trTitle("gf", mm), indoor: true, format: 1, meMons: [m], reward: "", foeTrainer: linkedTrainer(g), foeMons: [linkedFighter(g.party[0], "foe")],
+      contest: { type: G.types[0], pts: { me: m.item === "Black Scarf" ? 12 : 10, foe: 10 }, turns: { me: 0, foe: 0 }, hall: "", scarf: m.item === "Black Scarf" } });
+    if (S.battle) S.battle.tour = { kind: "gf", r: mm.r, pk: mm.pk, mine: mm.mine };
+  }
+  if (S.battle) { S.battle.net = { opp: from, n: g.n, contest: P.tour === "gf" }; S.battle.log.push(`${g.n} picks their own attacks on their phone.`); save(); render(); netPvpPush(true); }
+}
+
+/* ---------- routing ---------- */
+{ const _nh = netHandle; netHandle = function (from, msg) {
+  if (!msg) return;
+  if (msg.t === "gc-open") return gcOpen(from, msg);
+  if (msg.t === "gc-pick") return gcPick(from, msg);
+  if (msg.t === "gc-result") return gcResult(from, msg);
+  if (msg.t === "gc-npc") return gcNpc(from, msg);
+  if (msg.t === "tour-ready") { const k = msg.kind === "gf" ? "Grand Festival" : "Conference"; toast(`${netName(from)} is ready for your ${k} match. Start it from the ${k} event.`); return; }
+  if (msg.t === "pvp-inv" && msg.tour) {
+    if (S.battle) { netSend(from, { t: "pvp-no", why: "busy" }); return; }
+    modal(esc(msg.title), `<div>Your ${msg.tour === "gf" ? "Grand Festival" : "Conference"} match against ${esc(msg.n)} is ready. ${msg.tour === "conf" ? `You'll pick your ${msg.size} Pokémon next.` : "Your Grand Festival Pokémon battles theirs."} You choose your own attacks on this phone.</div><div class="row"><button class="btn primary" data-pa>Ready!</button><button class="btn ghost" data-pn>Not yet</button></div>`, (el) => {
+      $("[data-pa]", el).addEventListener("click", () => { closeModal(); trAccept(from, msg); });
+      $("[data-pn]", el).addEventListener("click", () => { closeModal(); netSend(from, { t: "pvp-no" }); });
+    });
+    return;
+  }
+  if (msg.t === "pvp-acc" && NET.pvp && NET.pvp.tour && NET.pvp.opp === from && NET.pvp.wait) { const g = decodeShare(msg.share); if (!g) return; addLinked(g); trStart(from, g); return; }
+  if (msg.t === "pvp-no" && NET.pvp && NET.pvp.tour && NET.pvp.opp === from) { NET.pvp = null; toast(`${netName(from)} isn't ready yet. Start the match again when they are.`); return; }
+  return _nh.apply(this, arguments);
+}; }
+// a tournament bracket or result that arrives on its own gets a heads-up
+{ const _ig = importGroup; importGroup = function (o) {
+  const before = JSON.stringify([S.tour && S.tour.conf && S.tour.conf.rounds && S.tour.conf.rounds.length, S.tour && S.tour.gf && S.tour.gf.rounds && S.tour.gf.rounds.length, !!(S.tour && S.tour.conf), !!(S.tour && S.tour.gf)]);
+  const r = _ig.apply(this, arguments);
+  if (r && gcOn()) {
+    const after = JSON.stringify([S.tour && S.tour.conf && S.tour.conf.rounds && S.tour.conf.rounds.length, S.tour && S.tour.gf && S.tour.gf.rounds && S.tour.gf.rounds.length, !!(S.tour && S.tour.conf), !!(S.tour && S.tour.gf)]);
+    if (before !== after) { const mc = trMatch("conf"), mg = trMatch("gf"), mm = mc || mg; toast(mm ? `Your ${mc ? "Conference" : "Grand Festival"} match is up: vs ${mm.opp.pl ? netName(mm.opp.pl) : mm.opp.n}.` : "The tournament bracket was updated."); }
+  }
+  return r;
+}; }
+// "out" belongs to each player: worked out from their own results, never copied from the host
+{ const _bo = bracketOut; bracketOut = function (T) { const o = _bo.apply(this, arguments); if (o) delete o.out; return o; }; }
+{ const _bi = bracketIn; bracketIn = function (T, keepMon) {
+  const o = _bi.apply(this, arguments); if (!o || !o.rounds) return o;
+  o.out = false;
+  o.rounds.forEach((cur, r) => { const k = cur.findIndex((x) => x && x.me); if (k < 0) return; const w = (o.res || {})[r + ":" + Math.floor(k / 2)]; if (w != null && w !== k % 2) o.out = true; });
+  return o;
+}; }
 
 /* ============================================================
    Battle flow, setup, settings, story, cloud save, startup
