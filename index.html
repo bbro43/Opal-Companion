@@ -13805,17 +13805,18 @@ function netPvpView() {
   const st = P.st, pick = { ty: "", tgt: "" };
   const bar = (x) => `<div class="li" style="${x.out ? "opacity:.45" : ""}">${sprite(x.sp, "sm")}<div class="main"><div class="t">${esc(x.n)}${x.act ? ` <span class="pill accent">In battle</span>` : ""}${x.st ? ` <span class="pill warn">${esc(x.st)}</span>` : ""}</div><div class="hpbar"><i style="width:${Math.max(0, Math.round((100 * x.hp) / Math.max(1, x.max)))}%"></i></div><div class="tiny muted">HP ${x.hp}/${x.max}${x.cp != null ? ` · <b>${x.cp} Contest Point${x.cp === 1 ? "" : "s"}</b>` : ""}${x.out ? " · out" : ""}</div></div></div>`;
   const body = () => !st ? `<div class="muted">Waiting for the battle to start…</div>` : `<div class="tiny muted">${st.contest ? esc(st.contest) + " Contest Battle · " : ""}Round ${st.round}</div>
-    <b>${esc(netName(P.opp))}</b><div class="stack">${st.them.filter((x) => x.act).map(bar).join("")}</div>
+    <b>${st.team ? "The Mafia" : esc(netName(P.opp))}</b><div class="stack">${st.them.filter((x) => x.act).map((x) => bar(x) + (st.team ? `<div class="tiny muted" style="margin:-4px 0 4px 44px">Lane ${x.lane + 1} · ${esc(x.who || "")}${st.tg.includes(x.k) ? " · in reach" : ""}</div>` : "")).join("")}</div>
+    ${st.allies && st.allies.length ? `<b>Your team</b><div class="stack">${st.allies.map((x) => bar(x) + `<div class="tiny muted" style="margin:-4px 0 4px 44px">Lane ${x.lane + 1} · ${esc(x.who || "")}</div>`).join("")}</div>` : ""}
     <b>You</b><div class="stack">${st.me.filter((x) => x.act).map(bar).join("")}</div>
-    ${st.turn ? `<div class="reminder"><b>${esc(st.turn.n)}'s turn.</b> Pick an attack type${st.them.filter((x) => x.act && !x.out).length > 1 ? " and a target" : ""}.</div>
+    ${st.turn ? `<div class="reminder"><b>${esc(st.turn.n)}'s turn.</b> Pick an attack type${(st.tg ? st.them.filter((x) => st.tg.includes(x.k)) : st.them.filter((x) => x.act && !x.out)).length > 1 ? " and a target" : ""}.</div>
       <div class="row">${st.turn.ty.map((t) => `<button class="btn ${pick.ty === t ? "primary" : ""}" data-np-ty="${t}">${typeChip(t)}</button>`).join("")}</div>
-      ${st.them.filter((x) => x.act && !x.out).length > 1 ? `<div class="row">${st.them.filter((x) => x.act && !x.out).map((x) => `<button class="btn sm ${pick.tgt === x.k ? "primary" : ""}" data-np-tg="${x.k}">${esc(x.n)}</button>`).join("")}</div>` : ""}
+      ${(st.tg ? st.them.filter((x) => st.tg.includes(x.k)) : st.them.filter((x) => x.act && !x.out)).length > 1 ? `<div class="row">${(st.tg ? st.them.filter((x) => st.tg.includes(x.k)) : st.them.filter((x) => x.act && !x.out)).map((x) => `<button class="btn sm ${pick.tgt === x.k ? "primary" : ""}" data-np-tg="${x.k}">${esc(x.n)}</button>`).join("")}</div>` : ""}
       ${st.turn.z ? `<label class="check"><input type="checkbox" id="np-z"> Z-Move (+3, once)</label>` : ""}
-      <div class="row"><button class="btn primary" data-np-atk>Attack</button>${st.noSub || st.contest || !st.me.some((x) => !x.act && !x.out) ? "" : `<button class="btn" data-np-sw>Switch</button>`}</div>` : st.over ? "" : `<div class="muted small">${esc(netName(P.opp))} is choosing…</div>`}
+      <div class="row"><button class="btn primary" data-np-atk>Attack</button>${st.noSub || st.contest || !st.me.some((x) => !x.act && !x.out) ? "" : `<button class="btn" data-np-sw>Switch</button>`}</div>` : st.over ? "" : `<div class="muted small">${st.team ? "Waiting for the next turn…" : esc(netName(P.opp)) + " is choosing…"}</div>`}
     <div class="log tiny">${st.log.map((l) => `<div>${esc(l)}</div>`).join("")}</div>
     <button class="btn ghost danger sm" data-np-quit>Leave the battle</button>`;
   const draw = (el) => { el.innerHTML = body(); };
-  modal(`${st && st.contest ? "Contest Battle" : "Live battle"} vs ${netName(P.opp)}`, body(), (el) => {
+  modal(st && st.team ? `${esc(st.title.replace(/ — .*$/, ""))}` : `${st && st.contest ? "Contest Battle" : "Live battle"} vs ${netName(P.opp)}`, body(), (el) => {
     MODAL.netPvp = true; MODAL.lock = "Use Leave the battle to stop.";
     el.addEventListener("click", (e) => {
       const ty = e.target.closest("[data-np-ty]"), tg = e.target.closest("[data-np-tg]");
@@ -14206,6 +14207,194 @@ function trStart(from, g) {
   o.out = false;
   o.rounds.forEach((cur, r) => { const k = cur.findIndex((x) => x && x.me); if (k < 0) return; const w = (o.res || {})[r + ":" + Math.floor(k / 2)]; if (w != null && w !== k % 2) o.out = true; });
   return o;
+}; }
+
+/* ================= Team battles against the Mafia (live room) =================
+   The host can invite connected players into a Mafia event. 2 players: a Double Battle; 3 players: a Triple Battle.
+   Each player has a lane and plays their own Pokémon on their own phone. Every Mafia member takes a lane on the other
+   side; when one is beaten, the next member steps into that lane. A Pokémon attacks its own lane or a lane next to it.
+   When a player or the last Mafia member on a side is out, the lanes close up. */
+const tmIsTeam = (B) => !!(B && B.team);
+function tmMafiaEvent(L, e) { if (!L || !e) return false; const tr = (L.tr || []).filter((t) => t.e === e.t); return tr.length >= 2 && tr.every((t) => /Mafia/i.test(t.n)); }
+function tmOrder(L, e) {
+  const rank = (t) => /Mafia Head|Pirate Captain/i.test(t.n) ? 4 : /Principal|Executive|Officer|Leader|Boss/i.test(t.n) ? 3 : /Teacher|Admin/i.test(t.n) ? 2 : 0;
+  const list = L.tr.map((t, j) => [t, j]).filter(([t]) => t.e === e.t && !S.beaten[L.n + "|" + t.n + "|" + t.at]).map(([t, j]) => [rank(t), j]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(([, j]) => j);
+  const ord = typeof EVENT_ORDER !== "undefined" && EVENT_ORDER[e.t]; if (ord) { list.length = 0; ord.forEach((nm) => { const j = L.tr.findIndex((t) => t.n === nm && t.e === e.t); if (j >= 0) list.push(j); }); }
+  return list;
+}
+const tmLane = (B, f) => B.sides[f.side].active.indexOf(B.sides[f.side].mons.indexOf(f));
+const tmReach = (B, a, t) => { const la = tmLane(B, a), lt = tmLane(B, t); return la < 0 || lt < 0 || Math.abs(la - lt) <= 1; };
+
+/* ---------- engine hooks (team battles only) ---------- */
+{ const _to = trainerOf; trainerOf = function (B, f) { return (B && B.team && f && f.tr) || _to.apply(this, arguments); }; }
+{ const _nc = npcChoice; npcChoice = function (B, cur, intuOver) {
+  if (!tmIsTeam(B)) return _nc.apply(this, arguments);
+  const sd = B.sides[foeSide(cur.side)], keep = sd.active.slice();
+  sd.active = keep.filter((i) => tmReach(B, cur, sd.mons[i]) || false);
+  if (!sd.active.some((i) => !sd.mons[i].fainted)) sd.active = keep;
+  try { return _nc.call(this, B, cur, intuOver != null ? intuOver : ((cur.tr || {}).intuition || 0)); } finally { sd.active = keep; }
+}; }
+{ const _pa = performAttack; performAttack = function (B, cur, tgt, ...a) {
+  if (tmIsTeam(B) && cur && tgt && cur.side !== tgt.side && !tmReach(B, cur, tgt)) {
+    const near = activeOf(B, tgt.side).filter((f) => !f.fainted && tmReach(B, cur, f)).sort((x, y) => Math.abs(tmLane(B, x) - tmLane(B, cur)) - Math.abs(tmLane(B, y) - tmLane(B, cur)))[0];
+    if (near) { B.log.push(`${cur.name} can only reach its own lane or the ones next to it, so it targets ${near.name}.`); tgt = near; }
+  }
+  return _pa.call(this, B, cur, tgt, ...a);
+}; }
+// a knocked-out Pokémon is replaced by its own trainer's next one; a beaten Mafia member's lane goes to the next member; an empty lane closes
+{ const _rf = replaceFainted; replaceFainted = function (B) {
+  if (!tmIsTeam(B)) return _rf.apply(this, arguments);
+  for (const side of ["me", "foe"]) {
+    const sd = B.sides[side]; if (!sd.active.some((i) => sd.mons[i] && sd.mons[i].fainted)) continue;
+    const used = new Set(sd.active), next = [];
+    sd.active.forEach((i) => {
+      const f = sd.mons[i]; if (!f || !f.fainted) { next.push(i); return; }
+      const lanesOwners = new Set(sd.active.map((x) => sd.mons[x] && !sd.mons[x].fainted && sd.mons[x].owner).filter(Boolean));
+      let j = sd.mons.findIndex((g, k) => !g.fainted && g.owner === f.owner && !used.has(k));
+      if (j < 0 && side === "foe") j = sd.mons.findIndex((g, k) => !g.fainted && !used.has(k) && !lanesOwners.has(g.owner));
+      if (j < 0) { B.log.push(side === "me" ? `${f.trName || "A player"} is out of Pokémon. The lanes close up.` : `${f.trName || "A Mafia member"} is beaten. The lanes close up.`); return; }
+      used.add(j); next.push(j);
+      const nf = sd.mons[j]; nf.actedRound = B.round;
+      B.log.push(nf.owner !== f.owner ? `${nf.trName} steps in and sends out ${nf.name}!` : `${nf.trName} sends out ${nf.name}!`);
+      onEnter(B, nf).forEach((m) => B.log.push(m));
+    });
+    if (next.some((i) => !sd.mons[i].fainted)) sd.active = next;
+  }
+}; }
+// whose turn it is decides whose phone plays it
+document.addEventListener("click", (e) => {
+  const B = S && S.battle; if (!tmIsTeam(B) || NET.bypass) return;
+  const t = e.target.closest('[data-act="attack"],[data-act="skip"],[data-act="b-swap"],[data-act="swap"],[data-act="b-item"],[data-act="mega"],[data-act="dmax"],[data-bv]'); if (!t || t.dataset.bv === "close" || t.dataset.bv === "back") return;
+  const cur = currentFighter(B);
+  if (cur && cur.side === "me" && cur.owner && cur.owner !== myPid()) { e.stopPropagation(); e.preventDefault(); toast(`${cur.trName} plays ${cur.name} on their phone.`); }
+  else if (t.dataset.act === "swap" || t.dataset.act === "b-swap") { e.stopPropagation(); e.preventDefault(); toast("In a team battle your next Pokémon comes in by itself."); }
+}, true);
+// the other players' moves arrive here and are played on this phone
+function tmMove(from, m) {
+  const B = S.battle; if (!tmIsTeam(B)) return;
+  const cur = currentFighter(B); if (!cur || cur.side !== "me" || cur.owner !== from) return;
+  const tgt = findF(B, m.tgt) || activeOf(B, "foe").find((f) => !f.fainted && tmReach(B, cur, f));
+  if (tgt) performAttack(B, cur, tgt, m.ty, null, null, !!m.z, true);
+  autoFoe(B); save(); render(); tmPush(true);
+}
+// what each player sees: their lane, their teammates and the lanes they can reach
+function tmSnap(B, pid) {
+  const cur = currentFighter(B), mine = (f) => f.owner === pid, lane = (f) => tmLane(B, f);
+  const row = (f, i) => ({ k: f.key, n: f.name, sp: f.sp, hp: f.hp, max: f.maxHp, st: f.status || "", ty: fighterTypes(f), out: f.fainted, act: B.sides[f.side].active.includes(B.sides[f.side].mons.indexOf(f)), i, who: f.trName, lane: lane(f) });
+  const me = B.sides.me.mons.filter(mine).map(row), myAct = B.sides.me.mons.find((f) => mine(f) && !f.fainted && tmLane(B, f) >= 0);
+  const them = B.sides.foe.mons.filter((f) => B.sides.foe.active.includes(B.sides.foe.mons.indexOf(f))).map(row);
+  const turn = cur && cur.side === "me" && cur.owner === pid ? { k: cur.key, n: cur.name, ty: fighterTypes(cur), z: !!(cur.item && (itemFind(cur.item) || {}).cat === "Z-Crystal" && !cur.zUsed && !cur.itemGone) } : null;
+  return { title: B.title, round: B.round, me, them, allies: B.sides.me.mons.filter((f) => !mine(f) && B.sides.me.active.includes(B.sides.me.mons.indexOf(f))).map(row), tg: myAct ? them.filter((x) => !x.out && Math.abs(x.lane - tmLane(B, myAct)) <= 1).map((x) => x.k) : [], turn, log: B.log.slice(-8), over: B.over || "", noSub: true, team: true };
+}
+function tmPush(force) {
+  const B = S.battle; if (!tmIsTeam(B)) return;
+  B.team.players.forEach((pid) => {
+    const st = tmSnap(B, pid), key = JSON.stringify([st.round, st.turn && st.turn.k, st.me.map((x) => x.hp), st.them.map((x) => x.k + x.hp), B.log.length]);
+    if (!force && NET["tmk" + pid] === key) return; NET["tmk" + pid] = key; netSend(pid, { t: "pvp-state", st });
+  });
+}
+setInterval(() => { try { if (tmIsTeam(S && S.battle)) tmPush(false); } catch (e) {} }, 700);
+
+/* ---------- starting a team event ---------- */
+{ const _ser = startEventRun; startEventRun = function (locName, i, ...a) {
+  const L = LOCMAP.get(locName), e = L && L.ev[i];
+  if (S.evRun || !gcOn() || !tmMafiaEvent(L, e) || tmSolo) { tmSolo = false; return _ser.apply(this, [locName, i, ...a]); }
+  const on = linked().filter((g) => !g.ranger && netOnline(g.pid));
+  if (!on.length) return _ser.apply(this, [locName, i, ...a]);
+  const sel = new Set();
+  const draw = () => `<div>Take on the Mafia together? Pick up to 2 connected players. With 1 it's a Double Battle, with 2 a Triple Battle. Each of you plays your own lane on your own phone.</div>
+    <div class="stack">${on.map((g) => `<label class="check"><input type="checkbox" data-tm-p="${esc(g.pid)}" ${sel.has(g.pid) ? "checked" : ""}> ${esc(g.n)}</label>`).join("")}</div>
+    <div class="row"><button class="btn primary" data-tm-go ${sel.size ? "" : "disabled"}>Invite ${sel.size ? sel.size + " player" + (sel.size > 1 ? "s" : "") : ""}</button><button class="btn" data-tm-solo>Go solo</button></div>`;
+  modal(e.t, draw(), (el) => el.addEventListener("click", (ev) => {
+    const c = ev.target.closest("[data-tm-p]"); if (c) { if (c.checked) { if (sel.size >= 2) { c.checked = false; toast("Up to 2 other players."); return; } sel.add(c.dataset.tmP); } else sel.delete(c.dataset.tmP); el.innerHTML = draw(); return; }
+    if (ev.target.closest("[data-tm-solo]")) { closeModal(); tmSolo = true; startEventRun(locName, i, ...a); return; }
+    if (ev.target.closest("[data-tm-go]")) { closeModal(); S.tmPend = { loc: locName, i, pids: [...sel], acc: {} }; save(); [...sel].forEach((pid) => netSend(pid, { t: "tm-inv", ev: e.t, loc: locName, n: S.trainer.name || "Trainer", size: sel.size + 1 })); render(); }
+  }));
+}; }
+let tmSolo = false;
+// waiting for everyone invited: the event doesn't start until they're in
+setInterval(() => {
+  const P = S && S.tmPend; let bar = document.getElementById("tm-pause");
+  if (!P) { if (bar) bar.remove(); return; }
+  const waiting = P.pids.filter((pid) => !P.acc[pid]);
+  if (!waiting.length) { tmStart(); return; }
+  if (!bar) { bar = document.createElement("div"); bar.id = "tm-pause"; bar.className = "net-pause"; document.body.append(bar); bar.addEventListener("click", (e) => {
+    if (e.target.closest("[data-tm-ask]")) { const P2 = S.tmPend; if (!P2) return; const L = LOCMAP.get(P2.loc); P2.pids.filter((x) => !P2.acc[x]).forEach((pid) => netSend(pid, { t: "tm-inv", ev: L.ev[P2.i].t, loc: P2.loc, n: S.trainer.name || "Trainer", size: P2.pids.length + 1 })); toast("Asked again"); }
+    if (e.target.closest("[data-tm-cancel]")) { S.tmPend = null; save(); toast("Team event cancelled"); }
+  }); }
+  const html = `<b>Team event</b> · waiting for ${waiting.map((p) => esc(netName(p))).join(" and ")} to join. <button class="btn sm" data-tm-ask>Ask again</button><button class="btn sm ghost" data-tm-cancel>Cancel</button>`;
+  if (bar.dataset.h !== html) { bar.innerHTML = html; bar.dataset.h = html; }
+}, 1000);
+function tmStart() {
+  const P = S.tmPend; if (!P) return; S.tmPend = null;
+  const L = LOCMAP.get(P.loc), e = L.ev[P.i], order = tmOrder(L, e);
+  if (!order.length) return;
+  const players = P.pids.map((pid) => P.acc[pid]).filter(Boolean), lanes = players.length + 1;
+  const mkFoe = [];
+  order.forEach((j) => { const t = L.tr[j], tr = { hasTrainer: true, name: t.n, ...trainerStats(L, t) }; t.m.forEach((r) => { const f = fighterFromRow(r, "foe"); f.owner = "t" + j; f.tr = tr; f.trName = t.n; mkFoe.push(f); }); });
+  S.evRun = { loc: L.n, i: P.i, list: order.slice(), pos: 0, team: true };
+  const host = fitMons().filter((m) => m.hp == null || m.hp > 0);
+  newBattle({ kind: "trainer", title: `${e.t} (team) — ${L.n}`, loc: L.n, format: lanes, evRun: true, eventName: e.t, reward: "", meMons: host,
+    foeTrainer: mkFoe[0].tr, foeMons: mkFoe });
+  const B = S.battle; if (!B) return;
+  B.evRun = true; B.trKey = null;
+  B.team = { players: players.map((g) => g.pid), order, prize: order.reduce((s, j) => s + (+String(L.tr[j].rw || "").replace(/[^\d]/g, "") || 0), 0) };
+  B.reward = B.team.prize ? "₽" + B.team.prize : ""; B.sides.foe.trainer = Object.assign({}, B.sides.foe.trainer, { name: "the Mafia" });
+  const me = myTrainer(); B.sides.me.mons.forEach((f) => { f.owner = myPid(); f.tr = me; f.trName = S.trainer.name || "You"; });
+  players.forEach((g) => { const tr = linkedTrainer(g); g.party.forEach((p) => { const f = linkedFighter(p, "me"); f.owner = g.pid; f.tr = tr; f.trName = g.n; f.side = "me"; B.sides.me.mons.push(f); }); });
+  // one lane per player, one lane per Mafia member
+  const firstOf = (sd, owners) => owners.map((o) => sd.mons.findIndex((f) => f.owner === o)).filter((x) => x >= 0);
+  B.sides.me.active = firstOf(B.sides.me, [myPid()].concat(players.map((g) => g.pid)));
+  B.sides.foe.active = firstOf(B.sides.foe, order.slice(0, lanes).map((j) => "t" + j));
+  B.log.push(`Team battle: ${[S.trainer.name || "You"].concat(players.map((g) => g.n)).join(", ")} vs ${order.map((j) => L.tr[j].n).join(", ")}. ${lanes === 2 ? "Double" : "Triple"} Battle; each Pokémon reaches its own lane and the ones next to it.`);
+  allActive(B).forEach((f) => onEnter(B, f).forEach((m) => B.log.push(m)));
+  players.forEach((g) => netSend(g.pid, { t: "tm-go", ev: e.t, loc: L.n }));
+  save(); render(); tmPush(true); autoFoe(B);
+}
+// the battle ends for everyone: the event passes or fails on every phone, with each player's HP
+{ const _bf = battleFinish; battleFinish = function (res, ...a) {
+  const B = S.battle;
+  if (tmIsTeam(B)) {
+    const L = LOCMAP.get(B.loc), R = S.evRun;
+    if (R && R.team) { if (res === "win") R.list.forEach((j) => { const t = L.tr[j]; S.beaten[L.n + "|" + t.n + "|" + t.at] = true; }); R.pos = res === "win" ? R.list.length - 1 : R.pos; }
+    B.team.players.forEach((pid) => {
+      const hp = {}; B.sides.me.mons.filter((f) => f.owner === pid).forEach((f) => (hp[f.name] = f.fainted ? 0 : f.hp));
+      netSend(pid, { t: "tm-end", res, loc: B.loc, ev: B.eventName, hp, prize: res === "win" ? B.team.prize : 0, used: B.sides.me.mons.filter((f) => f.owner === pid && (f.acted || f.fainted || f.entered)).map((f) => f.name) });
+    });
+  }
+  return _bf.apply(this, [res, ...a]);
+}; }
+
+/* ---------- on an invited player's phone ---------- */
+function tmInvite(from, m) {
+  if (S.battle) { netSend(from, { t: "tm-no", why: "busy" }); return; }
+  modal(`Team up: ${esc(m.ev)}`, `<div>${esc(m.n)} is taking on the Mafia in <b>${esc(m.ev)}</b> at ${esc(m.loc)} and wants you on the team. It's a ${m.size === 3 ? "Triple" : "Double"} Battle: you play your own lane on this phone with your healthy party.</div><div class="row"><button class="btn primary" data-tm-j>Join</button><button class="btn ghost" data-tm-n>Not now</button></div>`, (el) => {
+    $("[data-tm-j]", el).addEventListener("click", () => { closeModal(); const sh = shareObj(); sh.party = sh.party.filter((p) => { const mm = S.mons.find((x) => monName(x) === p.n); return !mm || mm.hp == null || mm.hp > 0; }); if (!sh.party.length) { toast("You need a healthy Pokémon."); netSend(from, { t: "tm-no" }); return; } netSend(from, { t: "tm-acc", share: encodeShare(Object.assign(sh, { ts: Date.now() })) }); toast(`You're on the team. Waiting for ${m.n} to start.`); });
+    $("[data-tm-n]", el).addEventListener("click", () => { closeModal(); netSend(from, { t: "tm-no" }); });
+  });
+}
+function tmEnd(from, m) {
+  NET.pvp = null; if (MODAL && MODAL.netPvp) { MODAL.lock = null; closeModal(); }
+  const L = LOCMAP.get(m.loc), e = L && L.ev.find((x) => x.t === m.ev), k = e && eventKey(L.n, e);
+  Object.entries(m.hp || {}).forEach(([n, hp]) => { const mm = S.mons.find((x) => monName(x) === n); if (mm) mm.hp = hp >= monStats(mm).hp ? null : hp; });
+  const won = m.res === "win";
+  if (e && k && !(S.events[k] === "passed")) { S.events[k] = won ? "passed" : "failed"; log(won ? "event" : "fail", `${won ? "Passed" : "Failed"} ${e.t} at ${L.n} as a team with ${netName(from)}.`); if (typeof eventOutcome === "function") eventOutcome(L, e, won ? "passed" : "failed"); }
+  if (won && m.prize) { S.money += m.prize; log("item", `The Mafia paid ${money(m.prize)}.`); }
+  const ids = (m.used || []).map((n) => (S.mons.find((x) => monName(x) === n) || {}).id).filter(Boolean);
+  save(); render();
+  if (won && e && typeof openRewards === "function") openRewards(L, e, () => commit("Event passed"), ids);
+  else modal(e ? e.t : "Team event", `<div>${won ? "The team beat the Mafia!" : "The Mafia won this time."}</div><button class="btn primary" data-act="modal-close">OK</button>`);
+}
+{ const _nh = netHandle; netHandle = function (from, msg) {
+  if (!msg) return;
+  if (msg.t === "tm-inv") return tmInvite(from, msg);
+  if (msg.t === "tm-acc") { const P = S.tmPend; if (!P || !P.pids.includes(from)) return; const g = decodeShare(msg.share); if (!g) return; const n0 = S.log.length; addLinked(g); if (S.log.length > n0 && /^Updated /.test(S.log[S.log.length - 1].text)) S.log.pop(); P.acc[from] = g; save(); toast(`${g.n} joined the team`); return; }
+  if (msg.t === "tm-no") { const P = S.tmPend; if (!P || !P.pids.includes(from)) return; P.pids = P.pids.filter((x) => x !== from); toast(`${netName(from)} can't join${msg.why === "busy" ? " (they're in a battle)" : ""}.`); if (!P.pids.length) { S.tmPend = null; tmSolo = true; startEventRun(P.loc, P.i); } save(); return; }
+  if (msg.t === "tm-go") { NET.pvp = { opp: from, remote: true, team: true }; netPvpView(); return; }
+  if (msg.t === "tm-end") return tmEnd(from, msg);
+  if (msg.t === "pvp-move" && tmIsTeam(S.battle)) return tmMove(from, msg);
+  if (msg.t === "pvp-quit" && tmIsTeam(S.battle)) { const B = S.battle; B.sides.me.mons.filter((f) => f.owner === from).forEach((f) => { f.hp = 0; f.fainted = true; }); B.log.push(`${netName(from)} left the battle.`); replaceFainted(B); autoFoe(B); save(); render(); return; }
+  return _nh.apply(this, arguments);
 }; }
 
 /* ============================================================
