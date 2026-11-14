@@ -14405,76 +14405,95 @@ function tmEnd(from, m) {
   return _nh.apply(this, arguments);
 }; }
 
-/* ================= Group minigames in a live room: Treasure Hunt and Fishing Challenge =================
-   The host invites connected players. Everyone who joins travels to the event and plays it on their own phone
-   with their own rolls; each result is shared, and the scoreboard shows on every phone when the last player finishes. */
-const GM_EV = {
-  "Treasure Hunt": { loc: "Route G08", score: (b) => `${money(b.gain)} of treasure`, val: (b) => b.gain },
-  "The Fishing Challenge": { loc: "Route W08", score: (b) => (b.won ? `Won the rod${b.best ? ` with ${b.best}` : ""}` : b.best ? `Best catch ${b.best}, not big enough` : "No catch"), val: (b) => (b.won ? 1000 : 0) + (b.bst || 0) },
-};
+/* ================= Group minigames in a live room =================
+   Every dice minigame (and the Fishing Challenge) can be played together, except the casino. The host invites
+   connected players; everyone who joins travels to the event and plays it on their own phone with their own rolls.
+   Each result is shared, and the scoreboard shows on every phone as players finish. */
+const GM_KINDS = ["spoink", "klink", "tangela", "race", "treasure", "dig", "perform", "ninja", "pair", "hikers", "flower", "cavein", "gen", "arcrace", "pidgey", "castform", "testfire", "sweet", "cycrace", "larv", "seed", "wxorb"];
+const GM_FISH = "The Fishing Challenge";
 let gmSolo = false;
-function gmKey(ev) { const L = LOCMAP.get(GM_EV[ev].loc), e = L && L.ev.find((x) => x.t === ev); return { L, e, k: e && eventKey(L.n, e) }; }
+const gmEv = (loc, i) => { const L = LOCMAP.get(loc), e = L && L.ev[i]; return { L, e, k: e && eventKey(L.n, e) }; };
+function gmScoreOf(G) {
+  if (G.ev === GM_FISH) return { txt: G.won ? `Won the rod${G.best ? ` with ${G.best}` : ""}` : G.best ? `Best catch ${G.best}, not big enough` : "No catch", v: (G.won ? 1000 : 0) + (G.bst || 0) };
+  const { k } = gmEv(G.loc, G.i), st = S.events[k], gain = Math.max(0, S.money - G.money0);
+  return { txt: `${st === "passed" ? "Passed" : "Failed"}${gain ? ` · ${money(gain)}` : ""}`, v: (st === "passed" ? 100000 : 0) + gain };
+}
 // the host chooses who plays along
-function gmInvite(ev, solo) {
-  const on = linked().filter((g) => !g.ranger && netOnline(g.pid));
-  if (!gcOn() || !on.length || gmSolo || S.gm) { gmSolo = false; return false; }
+function gmInvite(info, solo) {
+  if (S.gm && Date.now() - (S.gm.ts || 0) > 2 * 3600e3) S.gm = null;
+  const on = typeof NET === "undefined" ? [] : linked().filter((g) => !g.ranger && netOnline(g.pid));
+  if (!gcOn() || !on.length || gmSolo || S.gm || isRanger()) { gmSolo = false; return false; }
   const sel = new Set();
-  const draw = () => `<div>Play ${esc(ev)} together? Everyone who joins plays it on their own phone with their own rolls, and you all see the scoreboard at the end.</div>
+  const draw = () => `<div>Play ${esc(info.ev)} together? Everyone who joins plays it on their own phone with their own rolls, and you all see the scoreboard at the end.</div>
     <div class="stack">${on.map((g) => `<label class="check"><input type="checkbox" data-gm-p="${esc(g.pid)}" ${sel.has(g.pid) ? "checked" : ""}> ${esc(g.n)}</label>`).join("")}</div>
     <div class="row"><button class="btn primary" data-gm-go ${sel.size ? "" : "disabled"}>Invite and start</button><button class="btn" data-gm-solo>Play solo</button></div>`;
-  modal(ev, draw(), (el) => el.addEventListener("click", (x) => {
+  modal(info.ev, draw(), (el) => el.addEventListener("click", (x) => {
     const c = x.target.closest("[data-gm-p]"); if (c) { if (c.checked) sel.add(c.dataset.gmP); else sel.delete(c.dataset.gmP); el.innerHTML = draw(); return; }
     if (x.target.closest("[data-gm-solo]")) { closeModal(); gmSolo = true; solo(); return; }
     if (x.target.closest("[data-gm-go]")) {
       closeModal(); const id = uid();
-      S.gm = { id, ev, host: myPid(), players: [myPid(), ...sel], res: {}, n: S.trainer.name || "Trainer" }; gmBegin(ev); save();
-      [...sel].forEach((pid) => netSend(pid, { t: "gm-inv", id, ev, n: S.trainer.name || "Trainer" }));
+      S.gm = Object.assign({ id, host: myPid(), players: [myPid(), ...sel], res: {}, n: S.trainer.name || "Trainer", money0: S.money, ts: Date.now() }, info); save();
+      [...sel].forEach((pid) => netSend(pid, Object.assign({ t: "gm-inv", id, n: S.trainer.name || "Trainer" }, info)));
       gmSolo = true; solo();
+      // the host can't play it here (a needed Pokémon or item is missing): the others still play, and the host keeps the scoreboard
+      setTimeout(() => { const G = S.gm, { k } = gmEv(info.loc, info.i); if (G && G.id === id && !G.started && !MODAL && !S.fishing && !S.battle && !S.enc && !S.capture && !S.events[k]) { G.players = G.players.filter((p) => p !== myPid()); toast("You can't play this one right now, but the others can. You'll still see the scoreboard."); save(); if (!G.players.length) { S.gm = null; save(); } } }, 2500);
     }
   }));
   return true;
 }
-function gmBegin(ev) { S.gm.money0 = S.money; S.gm.best = null; S.gm.bst = 0; S.gm.won = false; }
-{ const _th = treasureHunt; treasureHunt = function (L, e, k) { if (!(S.thunt && S.thunt.k === k) && gmInvite("Treasure Hunt", () => treasureHunt(L, e, k))) return; gmSolo = false; return _th.apply(this, arguments); }; }
-{ const _sf = startFishing; startFishing = function (k) { if (!S.fishing && S.loc === "Route W08" && gmInvite("The Fishing Challenge", () => startFishing(k))) return; gmSolo = false; return _sf.apply(this, arguments); }; }
-{ const _fc = fishingCaught; fishingCaught = function (sp, types, bst) { const r = _fc.apply(this, arguments); if (S.gm && S.gm.ev === "The Fishing Challenge" && (!S.gm.best || bst > S.gm.bst) && types.includes("WATER")) { S.gm.best = `${sp} (BST ${bst})`; S.gm.bst = bst; } if (S.gm && S.fishing && S.fishing.won) S.gm.won = true; return r; }; }
+{ const _pr = procRun; procRun = function (el) {
+  const kind = el.dataset.kind, loc = el.dataset.loc, i = +el.dataset.i, { e } = gmEv(loc, i);
+  if (e && GM_KINDS.includes(kind) && gmInvite({ ev: e.t, loc, i, kind }, () => procRun(el))) return;
+  gmSolo = false; return _pr.apply(this, arguments);
+}; }
+{ const _sf = startFishing; startFishing = function (k) {
+  if (!S.fishing && S.loc === "Route W08") { const L = LOCMAP.get("Route W08"), i = L.ev.findIndex((x) => x.t === GM_FISH); if (gmInvite({ ev: GM_FISH, loc: L.n, i, kind: "fish" }, () => startFishing(k))) return; }
+  gmSolo = false; return _sf.apply(this, arguments);
+}; }
+{ const _fc = fishingCaught; fishingCaught = function (sp, types, bst) { const r = _fc.apply(this, arguments); const G = S.gm; if (G && G.ev === GM_FISH && types.includes("WATER") && (!G.best || bst > G.bst)) { G.best = `${sp} (BST ${bst})`; G.bst = bst; } if (G && S.fishing && S.fishing.won) G.won = true; return r; }; }
 // an invited player joins: they head to the event and start it on their own phone
 function gmJoin(from, m) {
-  if (S.battle || S.fishing || S.thunt) { netSend(from, { t: "gm-no", id: m.id, why: "busy" }); return; }
-  const { L, e, k } = gmKey(m.ev);
-  if (!L || !e) return;
+  if (S.gm && Date.now() - (S.gm.ts || 0) > 2 * 3600e3) S.gm = null;
+  if (S.battle || S.fishing || S.gm) { netSend(from, { t: "gm-no", id: m.id, why: "busy" }); return; }
+  const { L, e, k } = gmEv(m.loc, m.i); if (!L || !e) return;
   const done = S.events[k] === "passed" || S.events[k] === "failed";
-  modal(`${esc(m.ev)} with ${esc(m.n)}`, `<div>${esc(m.n)} is playing ${esc(m.ev)} on ${esc(L.n)} and wants you along. Joining takes you to ${esc(L.n)} and starts it on this phone with your own rolls.${done ? " <b>You've already done this event, so it's just for the scoreboard.</b>" : ""}</div><div class="row"><button class="btn primary" data-gm-j>Join</button><button class="btn ghost" data-gm-n>Not now</button></div>`, (el) => {
+  modal(`${esc(m.ev)} with ${esc(m.n)}`, `<div>${esc(m.n)} is playing ${esc(m.ev)} on ${esc(L.n)} and wants you along. Joining takes you to ${esc(L.n)} and starts it on this phone with your own rolls.${done ? " <b>You've already done this event, so it's just for the scoreboard; your earlier result stays.</b>" : ""}</div><div class="row"><button class="btn primary" data-gm-j>Join</button><button class="btn ghost" data-gm-n>Not now</button></div>`, (el) => {
     $("[data-gm-n]", el).addEventListener("click", () => { closeModal(); netSend(from, { t: "gm-no", id: m.id }); });
     $("[data-gm-j]", el).addEventListener("click", () => {
       closeModal();
       if (S.loc !== L.n) { S.loc = L.n; S.visited[L.n] = (S.visited[L.n] || 0) + 1; log("note", `Traveled to ${L.n} to join ${m.n} for ${m.ev}.`); }
-      S.gm = { id: m.id, ev: m.ev, host: from, players: [], res: {}, n: m.n, prev: done ? S.events[k] : undefined }; gmBegin(m.ev); save(); render();
-      gmSolo = true;
-      if (m.ev === "Treasure Hunt") { if (done) { delete S.events[k]; S.gm.replay = true; } treasureHunt(L, e, k); }
-      else { if (done) S.gm.replay = true; startFishing(k); }
+      S.gm = { id: m.id, ev: m.ev, loc: m.loc, i: m.i, kind: m.kind, host: from, players: [], res: {}, n: m.n, money0: S.money, ts: Date.now(), prev: done ? S.events[k] : undefined };
+      if (done) delete S.events[k];
+      save(); render(); gmSolo = true;
+      if (m.kind === "fish") startFishing(k);
+      else { const b = document.createElement("button"); Object.assign(b.dataset, { kind: m.kind, loc: m.loc, i: String(m.i) }); procRun(b); }
+      // couldn't start here (a needed item or Pokémon is missing): tell the host so nobody waits
+      setTimeout(() => { const G = S.gm; if (G && G.id === m.id && !G.started && !MODAL && !S.fishing && !S.battle && !S.enc && !S.capture && !S.events[k]) { if (G.prev !== undefined) S.events[k] = G.prev; S.gm = null; save(); netSend(from, { t: "gm-no", id: m.id, why: "cant" }); toast("You can't play this one right now."); } }, 2500);
     });
   });
 }
-// finished: the result goes to the host, who shares the scoreboard
+// finished (the event is passed or failed, or the Fishing Challenge ends): the result goes to the host
 setInterval(() => {
-  const G = S && S.gm; if (!G || G.sent || G.host === undefined) return;
-  const playing = G.ev === "Treasure Hunt" ? !!S.thunt : !!S.fishing;
-  if (playing) { if (!G.started) { G.started = true; save(); } return; }
-  if (!G.started) return;
-  if (G.replay && G.prev !== undefined) { const k = gmKey(G.ev).k; S.events[k] = G.prev; }
-  const b = { gain: Math.max(0, S.money - G.money0), won: !!G.won, best: G.best, bst: G.bst };
-  const row = { pid: myPid(), n: S.trainer.name || "Trainer", txt: GM_EV[G.ev].score(b), v: GM_EV[G.ev].val(b) };
+  const G = S && S.gm; if (!G || G.sent) return;
+  const { k } = gmEv(G.loc, G.i), fish = G.ev === GM_FISH;
+  if (fish ? S.fishing : ((MODAL && !/Scoreboard/.test(MODAL.title || "")) || S.battle || S.enc || S.capture)) { if (!G.started) { G.started = true; save(); } return; }
+  if (fish ? !G.started : !S.events[k]) return;
+  const sc = gmScoreOf(G);
+  if (G.prev !== undefined) S.events[k] = G.prev;
+  const row = { pid: myPid(), n: S.trainer.name || "Trainer", txt: sc.txt, v: sc.v };
   G.sent = true; save();
   if (G.host === myPid()) gmScore(myPid(), { id: G.id, row }); else netSend(G.host, { t: "gm-score", id: G.id, row });
 }, 1000);
 function gmScore(from, m) {
   const G = S.gm; if (!G || G.host !== myPid() || G.id !== m.id) return;
-  G.res[from] = m.row; save();
+  G.res[from] = m.row; save(); gmShare();
+}
+function gmShare() {
+  const G = S.gm; if (!G) return;
   const left = G.players.filter((p) => !G.res[p]);
   const board = { id: G.id, ev: G.ev, rows: Object.values(G.res).sort((a, b) => b.v - a.v), left: left.map(netName) };
   G.players.filter((p) => p !== myPid()).forEach((p) => netSend(p, { t: "gm-board", board }));
-  gmBoard(board);
+  if (board.rows.length && (G.res[myPid()] || !G.players.includes(myPid()))) gmBoard(board);
   if (!left.length) { log("event", `${G.ev} with the group: ${board.rows.map((r) => `${r.n} (${r.txt})`).join(", ")}.`); S.gm = null; save(); }
 }
 function gmBoard(b) {
@@ -14485,7 +14504,7 @@ function gmBoard(b) {
 { const _nh = netHandle; netHandle = function (from, msg) {
   if (!msg) return;
   if (msg.t === "gm-inv") return gmJoin(from, msg);
-  if (msg.t === "gm-no") { const G = S.gm; if (G && G.id === msg.id) { G.players = G.players.filter((p) => p !== from); toast(`${netName(from)} isn't joining${msg.why === "busy" ? " (they're busy)" : ""}.`); save(); } return; }
+  if (msg.t === "gm-no") { const G = S.gm; if (G && G.id === msg.id && G.host === myPid()) { G.players = G.players.filter((p) => p !== from); toast(`${netName(from)} ${msg.why === "cant" ? "can't play this one right now" : msg.why === "busy" ? "is busy" : "isn't joining"}.`); save(); if (!G.players.length) { S.gm = null; save(); } else if (Object.keys(G.res).length) gmShare(); } return; }
   if (msg.t === "gm-score") return gmScore(from, msg);
   if (msg.t === "gm-board") return gmBoard(msg.board);
   return _nh.apply(this, arguments);
