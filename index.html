@@ -13805,7 +13805,7 @@ function netPvpView() {
   const st = P.st, pick = { ty: "", tgt: "" };
   const bar = (x) => `<div class="li" style="${x.out ? "opacity:.45" : ""}">${sprite(x.sp, "sm")}<div class="main"><div class="t">${esc(x.n)}${x.act ? ` <span class="pill accent">In battle</span>` : ""}${x.st ? ` <span class="pill warn">${esc(x.st)}</span>` : ""}</div><div class="hpbar"><i style="width:${Math.max(0, Math.round((100 * x.hp) / Math.max(1, x.max)))}%"></i></div><div class="tiny muted">HP ${x.hp}/${x.max}${x.cp != null ? ` · <b>${x.cp} Contest Point${x.cp === 1 ? "" : "s"}</b>` : ""}${x.out ? " · out" : ""}</div></div></div>`;
   const body = () => !st ? `<div class="muted">Waiting for the battle to start…</div>` : `<div class="tiny muted">${st.contest ? esc(st.contest) + " Contest Battle · " : ""}Round ${st.round}</div>
-    <b>${st.team ? "The Mafia" : esc(netName(P.opp))}</b><div class="stack">${st.them.filter((x) => x.act).map((x) => bar(x) + (st.team ? `<div class="tiny muted" style="margin:-4px 0 4px 44px">Lane ${x.lane + 1} · ${esc(x.who || "")}${st.tg.includes(x.k) ? " · in reach" : ""}</div>` : "")).join("")}</div>
+    <b>${st.team ? "Opponents" : esc(netName(P.opp))}</b><div class="stack">${st.them.filter((x) => x.act).map((x) => bar(x) + (st.team ? `<div class="tiny muted" style="margin:-4px 0 4px 44px">Lane ${x.lane + 1} · ${esc(x.who || "")}${st.tg.includes(x.k) ? " · in reach" : ""}</div>` : "")).join("")}</div>
     ${st.allies && st.allies.length ? `<b>Your team</b><div class="stack">${st.allies.map((x) => bar(x) + `<div class="tiny muted" style="margin:-4px 0 4px 44px">Lane ${x.lane + 1} · ${esc(x.who || "")}</div>`).join("")}</div>` : ""}
     <b>You</b><div class="stack">${st.me.filter((x) => x.act).map(bar).join("")}</div>
     ${st.turn ? `<div class="reminder"><b>${esc(st.turn.n)}'s turn.</b> Pick an attack type${(st.tg ? st.them.filter((x) => st.tg.includes(x.k)) : st.them.filter((x) => x.act && !x.out)).length > 1 ? " and a target" : ""}.</div>
@@ -14215,7 +14215,14 @@ function trStart(from, g) {
    side; when one is beaten, the next member steps into that lane. A Pokémon attacks its own lane or a lane next to it.
    When a player or the last Mafia member on a side is out, the lanes close up. */
 const tmIsTeam = (B) => !!(B && B.team);
-function tmMafiaEvent(L, e) { if (!L || !e) return false; const tr = (L.tr || []).filter((t) => t.e === e.t); return tr.length >= 2 && tr.every((t) => /Mafia/i.test(t.n)); }
+function tmMafiaEvent(L, e) {
+  if (!L || !e || isRanger()) return false;
+  const tr = (L.tr || []).filter((t) => t.e === e.t); if (!tr.length) return false;
+  if (tr.some((t) => /^(Rival|Gym|Coordinator|Frontier|Elite|Champion|Grand Champion|Trainer )/.test(t.n))) return false;
+  if (/Battle Festival|Trainer Tower|Hitmon|Contest/.test(e.t) || (typeof EVENT_CATCH !== "undefined" && EVENT_CATCH[e.t]) || mustCatch(e)) return false;
+  if (/alongside Meowstic|Join the Rangers in a Double Battle/i.test(e.d || "") || tr.some((t) => typeof nidoAlly === "function" && nidoAlly(L, t))) return false;
+  return tr.reduce((s, t) => s + t.m.length, 0) >= 2;
+}
 function tmOrder(L, e) {
   const rank = (t) => /Mafia Head|Pirate Captain/i.test(t.n) ? 4 : /Principal|Executive|Officer|Leader|Boss/i.test(t.n) ? 3 : /Teacher|Admin/i.test(t.n) ? 2 : 0;
   const list = L.tr.map((t, j) => [t, j]).filter(([t]) => t.e === e.t && !S.beaten[L.n + "|" + t.n + "|" + t.at]).map(([t, j]) => [rank(t), j]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(([, j]) => j);
@@ -14252,7 +14259,8 @@ const tmReach = (B, a, t) => { const la = tmLane(B, a), lt = tmLane(B, t); retur
       const lanesOwners = new Set(sd.active.map((x) => sd.mons[x] && !sd.mons[x].fainted && sd.mons[x].owner).filter(Boolean));
       let j = sd.mons.findIndex((g, k) => !g.fainted && g.owner === f.owner && !used.has(k));
       if (j < 0 && side === "foe") j = sd.mons.findIndex((g, k) => !g.fainted && !used.has(k) && !lanesOwners.has(g.owner));
-      if (j < 0) { B.log.push(side === "me" ? `${f.trName || "A player"} is out of Pokémon. The lanes close up.` : `${f.trName || "A Mafia member"} is beaten. The lanes close up.`); return; }
+      if (j < 0 && side === "foe") j = sd.mons.findIndex((g, k) => !g.fainted && !used.has(k));
+      if (j < 0) { B.log.push(side === "me" ? `${f.trName || "A player"} is out of Pokémon. The lanes close up.` : `${f.trName || "An opponent"} is beaten. The lanes close up.`); return; }
       used.add(j); next.push(j);
       const nf = sd.mons[j]; nf.actedRound = B.round;
       B.log.push(nf.owner !== f.owner ? `${nf.trName} steps in and sends out ${nf.name}!` : `${nf.trName} sends out ${nf.name}!`);
@@ -14302,7 +14310,7 @@ setInterval(() => { try { if (tmIsTeam(S && S.battle)) tmPush(false); } catch (e
   const on = linked().filter((g) => !g.ranger && netOnline(g.pid));
   if (!on.length) return _ser.apply(this, [locName, i, ...a]);
   const sel = new Set();
-  const draw = () => `<div>Take on the Mafia together? Pick up to 2 connected players. With 1 it's a Double Battle, with 2 a Triple Battle. Each of you plays your own lane on your own phone.</div>
+  const draw = () => `<div>Take this on together? Pick up to 2 connected players. With 1 it's a Double Battle, with 2 a Triple Battle. Each of you plays your own lane on your own phone.</div>
     <div class="stack">${on.map((g) => `<label class="check"><input type="checkbox" data-tm-p="${esc(g.pid)}" ${sel.has(g.pid) ? "checked" : ""}> ${esc(g.n)}</label>`).join("")}</div>
     <div class="row"><button class="btn primary" data-tm-go ${sel.size ? "" : "disabled"}>Invite ${sel.size ? sel.size + " player" + (sel.size > 1 ? "s" : "") : ""}</button><button class="btn" data-tm-solo>Go solo</button></div>`;
   modal(e.t, draw(), (el) => el.addEventListener("click", (ev) => {
@@ -14331,7 +14339,7 @@ function tmStart() {
   if (!order.length) return;
   const players = P.pids.map((pid) => P.acc[pid]).filter(Boolean), lanes = players.length + 1;
   const mkFoe = [];
-  order.forEach((j) => { const t = L.tr[j], tr = { hasTrainer: true, name: t.n, ...trainerStats(L, t) }; t.m.forEach((r) => { const f = fighterFromRow(r, "foe"); f.owner = "t" + j; f.tr = tr; f.trName = t.n; mkFoe.push(f); }); });
+  order.forEach((j) => { const t = L.tr[j], boss = !t.rw && !/^(Trainer|Rival|Gym|Frontier|Mafia|Coordinator)/.test(t.n), tr = boss ? { hasTrainer: false, name: t.n, obedience: 0, intuition: 0, will: 0 } : { hasTrainer: true, name: t.n, ...trainerStats(L, t) }; t.m.forEach((r) => { const f = fighterFromRow(r, "foe"); f.owner = "t" + j; f.tr = tr; f.trName = t.n; if (/^Dynamax /.test(t.n)) { f.maxHp *= 2; f.hp = f.maxHp; f.dmax = 1; f.dmaxPerm = true; } mkFoe.push(f); }); });
   S.evRun = { loc: L.n, i: P.i, list: order.slice(), pos: 0, team: true };
   const host = fitMons().filter((m) => m.hp == null || m.hp > 0);
   newBattle({ kind: "trainer", title: `${e.t} (team) — ${L.n}`, loc: L.n, format: lanes, evRun: true, eventName: e.t, reward: "", meMons: host,
@@ -14339,13 +14347,13 @@ function tmStart() {
   const B = S.battle; if (!B) return;
   B.evRun = true; B.trKey = null;
   B.team = { players: players.map((g) => g.pid), order, prize: order.reduce((s, j) => s + (+String(L.tr[j].rw || "").replace(/[^\d]/g, "") || 0), 0) };
-  B.reward = B.team.prize ? "₽" + B.team.prize : ""; B.sides.foe.trainer = Object.assign({}, B.sides.foe.trainer, { name: "the Mafia" });
+  B.reward = B.team.prize ? "₽" + B.team.prize : ""; B.sides.foe.trainer = Object.assign({}, B.sides.foe.trainer, { name: order.every((j) => /Mafia/.test(L.tr[j].n)) ? "the Mafia" : e.t });
   const me = myTrainer(); B.sides.me.mons.forEach((f) => { f.owner = myPid(); f.tr = me; f.trName = S.trainer.name || "You"; });
   players.forEach((g) => { const tr = linkedTrainer(g); g.party.forEach((p) => { const f = linkedFighter(p, "me"); f.owner = g.pid; f.tr = tr; f.trName = g.n; f.side = "me"; B.sides.me.mons.push(f); }); });
   // one lane per player, one lane per Mafia member
   const firstOf = (sd, owners) => owners.map((o) => sd.mons.findIndex((f) => f.owner === o)).filter((x) => x >= 0);
   B.sides.me.active = firstOf(B.sides.me, [myPid()].concat(players.map((g) => g.pid)));
-  B.sides.foe.active = firstOf(B.sides.foe, order.slice(0, lanes).map((j) => "t" + j));
+  { const fa = []; for (let round = 0; fa.length < lanes && round < 6; round++) order.forEach((j) => { if (fa.length >= lanes) return; const idx = B.sides.foe.mons.map((f, k) => [f, k]).filter(([f]) => f.owner === "t" + j)[round]; if (idx) fa.push(idx[1]); }); B.sides.foe.active = fa; }
   B.log.push(`Team battle: ${[S.trainer.name || "You"].concat(players.map((g) => g.n)).join(", ")} vs ${order.map((j) => L.tr[j].n).join(", ")}. ${lanes === 2 ? "Double" : "Triple"} Battle; each Pokémon reaches its own lane and the ones next to it.`);
   allActive(B).forEach((f) => onEnter(B, f).forEach((m) => B.log.push(m)));
   players.forEach((g) => netSend(g.pid, { t: "tm-go", ev: e.t, loc: L.n }));
@@ -14368,7 +14376,7 @@ function tmStart() {
 /* ---------- on an invited player's phone ---------- */
 function tmInvite(from, m) {
   if (S.battle) { netSend(from, { t: "tm-no", why: "busy" }); return; }
-  modal(`Team up: ${esc(m.ev)}`, `<div>${esc(m.n)} is taking on the Mafia in <b>${esc(m.ev)}</b> at ${esc(m.loc)} and wants you on the team. It's a ${m.size === 3 ? "Triple" : "Double"} Battle: you play your own lane on this phone with your healthy party.</div><div class="row"><button class="btn primary" data-tm-j>Join</button><button class="btn ghost" data-tm-n>Not now</button></div>`, (el) => {
+  modal(`Team up: ${esc(m.ev)}`, `<div>${esc(m.n)} is taking on <b>${esc(m.ev)}</b> at ${esc(m.loc)} and wants you on the team. It's a ${m.size === 3 ? "Triple" : "Double"} Battle: you play your own lane on this phone with your healthy party.</div><div class="row"><button class="btn primary" data-tm-j>Join</button><button class="btn ghost" data-tm-n>Not now</button></div>`, (el) => {
     $("[data-tm-j]", el).addEventListener("click", () => { closeModal(); const sh = shareObj(); sh.party = sh.party.filter((p) => { const mm = S.mons.find((x) => monName(x) === p.n); return !mm || mm.hp == null || mm.hp > 0; }); if (!sh.party.length) { toast("You need a healthy Pokémon."); netSend(from, { t: "tm-no" }); return; } netSend(from, { t: "tm-acc", share: encodeShare(Object.assign(sh, { ts: Date.now() })) }); toast(`You're on the team. Waiting for ${m.n} to start.`); });
     $("[data-tm-n]", el).addEventListener("click", () => { closeModal(); netSend(from, { t: "tm-no" }); });
   });
@@ -14379,11 +14387,11 @@ function tmEnd(from, m) {
   Object.entries(m.hp || {}).forEach(([n, hp]) => { const mm = S.mons.find((x) => monName(x) === n); if (mm) mm.hp = hp >= monStats(mm).hp ? null : hp; });
   const won = m.res === "win";
   if (e && k && !(S.events[k] === "passed")) { S.events[k] = won ? "passed" : "failed"; log(won ? "event" : "fail", `${won ? "Passed" : "Failed"} ${e.t} at ${L.n} as a team with ${netName(from)}.`); if (typeof eventOutcome === "function") eventOutcome(L, e, won ? "passed" : "failed"); }
-  if (won && m.prize) { S.money += m.prize; log("item", `The Mafia paid ${money(m.prize)}.`); }
+  if (won && m.prize) { S.money += m.prize; log("item", `The team prize was ${money(m.prize)}.`); }
   const ids = (m.used || []).map((n) => (S.mons.find((x) => monName(x) === n) || {}).id).filter(Boolean);
   save(); render();
   if (won && e && typeof openRewards === "function") openRewards(L, e, () => commit("Event passed"), ids);
-  else modal(e ? e.t : "Team event", `<div>${won ? "The team beat the Mafia!" : "The Mafia won this time."}</div><button class="btn primary" data-act="modal-close">OK</button>`);
+  else modal(e ? e.t : "Team event", `<div>${won ? "Your team won!" : "Your team lost this time."}</div><button class="btn primary" data-act="modal-close">OK</button>`);
 }
 { const _nh = netHandle; netHandle = function (from, msg) {
   if (!msg) return;
@@ -14394,6 +14402,92 @@ function tmEnd(from, m) {
   if (msg.t === "tm-end") return tmEnd(from, msg);
   if (msg.t === "pvp-move" && tmIsTeam(S.battle)) return tmMove(from, msg);
   if (msg.t === "pvp-quit" && tmIsTeam(S.battle)) { const B = S.battle; B.sides.me.mons.filter((f) => f.owner === from).forEach((f) => { f.hp = 0; f.fainted = true; }); B.log.push(`${netName(from)} left the battle.`); replaceFainted(B); autoFoe(B); save(); render(); return; }
+  return _nh.apply(this, arguments);
+}; }
+
+/* ================= Group minigames in a live room: Treasure Hunt and Fishing Challenge =================
+   The host invites connected players. Everyone who joins travels to the event and plays it on their own phone
+   with their own rolls; each result is shared, and the scoreboard shows on every phone when the last player finishes. */
+const GM_EV = {
+  "Treasure Hunt": { loc: "Route G08", score: (b) => `${money(b.gain)} of treasure`, val: (b) => b.gain },
+  "The Fishing Challenge": { loc: "Route W08", score: (b) => (b.won ? `Won the rod${b.best ? ` with ${b.best}` : ""}` : b.best ? `Best catch ${b.best}, not big enough` : "No catch"), val: (b) => (b.won ? 1000 : 0) + (b.bst || 0) },
+};
+let gmSolo = false;
+function gmKey(ev) { const L = LOCMAP.get(GM_EV[ev].loc), e = L && L.ev.find((x) => x.t === ev); return { L, e, k: e && eventKey(L.n, e) }; }
+// the host chooses who plays along
+function gmInvite(ev, solo) {
+  const on = linked().filter((g) => !g.ranger && netOnline(g.pid));
+  if (!gcOn() || !on.length || gmSolo || S.gm) { gmSolo = false; return false; }
+  const sel = new Set();
+  const draw = () => `<div>Play ${esc(ev)} together? Everyone who joins plays it on their own phone with their own rolls, and you all see the scoreboard at the end.</div>
+    <div class="stack">${on.map((g) => `<label class="check"><input type="checkbox" data-gm-p="${esc(g.pid)}" ${sel.has(g.pid) ? "checked" : ""}> ${esc(g.n)}</label>`).join("")}</div>
+    <div class="row"><button class="btn primary" data-gm-go ${sel.size ? "" : "disabled"}>Invite and start</button><button class="btn" data-gm-solo>Play solo</button></div>`;
+  modal(ev, draw(), (el) => el.addEventListener("click", (x) => {
+    const c = x.target.closest("[data-gm-p]"); if (c) { if (c.checked) sel.add(c.dataset.gmP); else sel.delete(c.dataset.gmP); el.innerHTML = draw(); return; }
+    if (x.target.closest("[data-gm-solo]")) { closeModal(); gmSolo = true; solo(); return; }
+    if (x.target.closest("[data-gm-go]")) {
+      closeModal(); const id = uid();
+      S.gm = { id, ev, host: myPid(), players: [myPid(), ...sel], res: {}, n: S.trainer.name || "Trainer" }; gmBegin(ev); save();
+      [...sel].forEach((pid) => netSend(pid, { t: "gm-inv", id, ev, n: S.trainer.name || "Trainer" }));
+      gmSolo = true; solo();
+    }
+  }));
+  return true;
+}
+function gmBegin(ev) { S.gm.money0 = S.money; S.gm.best = null; S.gm.bst = 0; S.gm.won = false; }
+{ const _th = treasureHunt; treasureHunt = function (L, e, k) { if (!(S.thunt && S.thunt.k === k) && gmInvite("Treasure Hunt", () => treasureHunt(L, e, k))) return; gmSolo = false; return _th.apply(this, arguments); }; }
+{ const _sf = startFishing; startFishing = function (k) { if (!S.fishing && S.loc === "Route W08" && gmInvite("The Fishing Challenge", () => startFishing(k))) return; gmSolo = false; return _sf.apply(this, arguments); }; }
+{ const _fc = fishingCaught; fishingCaught = function (sp, types, bst) { const r = _fc.apply(this, arguments); if (S.gm && S.gm.ev === "The Fishing Challenge" && (!S.gm.best || bst > S.gm.bst) && types.includes("WATER")) { S.gm.best = `${sp} (BST ${bst})`; S.gm.bst = bst; } if (S.gm && S.fishing && S.fishing.won) S.gm.won = true; return r; }; }
+// an invited player joins: they head to the event and start it on their own phone
+function gmJoin(from, m) {
+  if (S.battle || S.fishing || S.thunt) { netSend(from, { t: "gm-no", id: m.id, why: "busy" }); return; }
+  const { L, e, k } = gmKey(m.ev);
+  if (!L || !e) return;
+  const done = S.events[k] === "passed" || S.events[k] === "failed";
+  modal(`${esc(m.ev)} with ${esc(m.n)}`, `<div>${esc(m.n)} is playing ${esc(m.ev)} on ${esc(L.n)} and wants you along. Joining takes you to ${esc(L.n)} and starts it on this phone with your own rolls.${done ? " <b>You've already done this event, so it's just for the scoreboard.</b>" : ""}</div><div class="row"><button class="btn primary" data-gm-j>Join</button><button class="btn ghost" data-gm-n>Not now</button></div>`, (el) => {
+    $("[data-gm-n]", el).addEventListener("click", () => { closeModal(); netSend(from, { t: "gm-no", id: m.id }); });
+    $("[data-gm-j]", el).addEventListener("click", () => {
+      closeModal();
+      if (S.loc !== L.n) { S.loc = L.n; S.visited[L.n] = (S.visited[L.n] || 0) + 1; log("note", `Traveled to ${L.n} to join ${m.n} for ${m.ev}.`); }
+      S.gm = { id: m.id, ev: m.ev, host: from, players: [], res: {}, n: m.n, prev: done ? S.events[k] : undefined }; gmBegin(m.ev); save(); render();
+      gmSolo = true;
+      if (m.ev === "Treasure Hunt") { if (done) { delete S.events[k]; S.gm.replay = true; } treasureHunt(L, e, k); }
+      else { if (done) S.gm.replay = true; startFishing(k); }
+    });
+  });
+}
+// finished: the result goes to the host, who shares the scoreboard
+setInterval(() => {
+  const G = S && S.gm; if (!G || G.sent || G.host === undefined) return;
+  const playing = G.ev === "Treasure Hunt" ? !!S.thunt : !!S.fishing;
+  if (playing) { if (!G.started) { G.started = true; save(); } return; }
+  if (!G.started) return;
+  if (G.replay && G.prev !== undefined) { const k = gmKey(G.ev).k; S.events[k] = G.prev; }
+  const b = { gain: Math.max(0, S.money - G.money0), won: !!G.won, best: G.best, bst: G.bst };
+  const row = { pid: myPid(), n: S.trainer.name || "Trainer", txt: GM_EV[G.ev].score(b), v: GM_EV[G.ev].val(b) };
+  G.sent = true; save();
+  if (G.host === myPid()) gmScore(myPid(), { id: G.id, row }); else netSend(G.host, { t: "gm-score", id: G.id, row });
+}, 1000);
+function gmScore(from, m) {
+  const G = S.gm; if (!G || G.host !== myPid() || G.id !== m.id) return;
+  G.res[from] = m.row; save();
+  const left = G.players.filter((p) => !G.res[p]);
+  const board = { id: G.id, ev: G.ev, rows: Object.values(G.res).sort((a, b) => b.v - a.v), left: left.map(netName) };
+  G.players.filter((p) => p !== myPid()).forEach((p) => netSend(p, { t: "gm-board", board }));
+  gmBoard(board);
+  if (!left.length) { log("event", `${G.ev} with the group: ${board.rows.map((r) => `${r.n} (${r.txt})`).join(", ")}.`); S.gm = null; save(); }
+}
+function gmBoard(b) {
+  if (S.gm && S.gm.id === b.id && !b.left.length && S.gm.host !== myPid()) { log("event", `${b.ev} with the group: ${b.rows.map((r) => `${r.n} (${r.txt})`).join(", ")}.`); S.gm = null; save(); }
+  if (MODAL && !/Scoreboard/.test(MODAL.title || "")) return;
+  modal(`${esc(b.ev)} Scoreboard`, `<table class="t"><tbody>${b.rows.map((r, i) => `<tr><td>${i + 1}</td><td class="${r.pid === myPid() ? "me" : ""}"><b>${esc(r.n)}</b></td><td>${esc(r.txt)}</td></tr>`).join("")}</tbody></table>${b.left.length ? `<div class="small muted">Still playing: ${b.left.map(esc).join(", ")}</div>` : `<div class="small"><b>Everyone's done!</b></div>`}<button class="btn primary" data-act="modal-close">OK</button>`);
+}
+{ const _nh = netHandle; netHandle = function (from, msg) {
+  if (!msg) return;
+  if (msg.t === "gm-inv") return gmJoin(from, msg);
+  if (msg.t === "gm-no") { const G = S.gm; if (G && G.id === msg.id) { G.players = G.players.filter((p) => p !== from); toast(`${netName(from)} isn't joining${msg.why === "busy" ? " (they're busy)" : ""}.`); save(); } return; }
+  if (msg.t === "gm-score") return gmScore(from, msg);
+  if (msg.t === "gm-board") return gmBoard(msg.board);
   return _nh.apply(this, arguments);
 }; }
 
